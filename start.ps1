@@ -64,7 +64,7 @@ Write-Host "TinyLM Council is starting:"
 Write-Host "  PC:       http://localhost:5173"
 Write-Host "  Backend:  http://localhost:8001"
 if ($tailscaleIp) {
-    Write-Host "  Mobile:   http://${tailscaleIp}:5173  (Tailscale — phone on same tailnet)"
+    Write-Host "  Mobile:   http://$tailscaleIp`:5173  (Tailscale - phone on same tailnet)"
     Write-Host "            Add to Home Screen in your phone browser for a PWA shortcut."
 } else {
     Write-Host "  Mobile:   Install Tailscale on PC and phone, then open http://<pc-tailscale-ip>:5173"
