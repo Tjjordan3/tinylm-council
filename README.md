@@ -43,7 +43,7 @@ Switch profiles in **Settings**.
 **Backend** (Python 3.10+):
 
 ```powershell
-cd C:\Users\tjord\projects\llm-council
+cd path\to\tinylm-council
 python -m pip install -r requirements.txt
 ```
 
@@ -71,7 +71,56 @@ Add `OPENROUTER_API_KEY` for OpenRouter cloud models.
 .\start.ps1
 ```
 
-Open http://localhost:5173
+Open http://localhost:5173 on your PC.
+
+## Mobile access with Tailscale
+
+TinyLM Council is a single web app. Your PC keeps the same desktop experience at `http://localhost:5173`, and you can also open it on your phone over [Tailscale](https://tailscale.com/) — no separate mobile app required.
+
+### Prerequisites
+
+1. [Tailscale](https://tailscale.com/download) installed on your **PC** and **phone**, signed into the same tailnet
+2. TinyLM Council running on the PC (`.\start.ps1` or manual start below)
+3. Windows Firewall (if prompted) allowing inbound connections on port **5173**
+
+The frontend dev server binds to all interfaces (`0.0.0.0:5173`). API calls still go through the Vite proxy to the backend on your PC, so models run locally — your phone is just a remote browser.
+
+### Find your PC's Tailscale address
+
+On the PC:
+
+```powershell
+tailscale ip -4
+```
+
+Or use your PC's MagicDNS name from the Tailscale admin console (e.g. `http://my-pc:5173`).
+
+`start.ps1` prints the mobile URL automatically when Tailscale CLI is available.
+
+### Open on your phone
+
+In your phone browser, go to:
+
+```text
+http://<your-pc-tailscale-ip>:5173
+```
+
+Replace `<your-pc-tailscale-ip>` with the address from `tailscale ip -4` (typically a `100.x.x.x` address).
+
+### Install as a PWA (optional)
+
+On your phone:
+
+- **iOS (Safari):** Share → **Add to Home Screen**
+- **Android (Chrome):** Menu → **Install app** or **Add to Home Screen**
+
+This creates a home-screen shortcut to the same Tailscale URL. It is not a native app — inference still runs on your PC.
+
+### Security notes
+
+- Only devices on **your** Tailscale tailnet can reach the app.
+- Do not expose ports 5173/8001 to the public internet without additional auth.
+- Conversations and settings stay in the local `data/` folder on your PC (gitignored).
 
 ## Manual start
 
@@ -81,12 +130,14 @@ Open http://localhost:5173
 python -m backend.main
 ```
 
-**Frontend:**
+**Frontend** (network-accessible for Tailscale):
 
 ```powershell
 cd frontend
 npm run dev
 ```
+
+Vite is configured with `host: true`, so the frontend listens on `0.0.0.0:5173` as well as localhost.
 
 ## Self-hosted setup
 
@@ -107,8 +158,8 @@ npm run dev
 ```
 tinylm-council/
   backend/           FastAPI server, council logic, tiny-model prompts
-  frontend/          React + Vite UI
-  data/              Settings and conversations (runtime)
+  frontend/          React + Vite UI (responsive + PWA manifest)
+  data/              Settings and conversations (runtime, not committed)
   start.ps1          Windows launcher
 ```
 

@@ -66,7 +66,7 @@ export default function ChatInterface({ conversation, onSendMessage, isLoading, 
 
   return (
     <main className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6">
         {conversation.messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-center">
             <h2 className="text-xl font-semibold text-white">Start a conversation</h2>
@@ -117,8 +117,8 @@ export default function ChatInterface({ conversation, onSendMessage, isLoading, 
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="border-t border-gray-800 p-4">
-        <form onSubmit={handleSubmit} className="mx-auto flex max-w-4xl gap-3">
+      <div className="border-t border-gray-800 p-3 md:p-4">
+        <form onSubmit={handleSubmit} className="mx-auto flex max-w-4xl flex-col gap-3 sm:flex-row">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -131,7 +131,7 @@ export default function ChatInterface({ conversation, onSendMessage, isLoading, 
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="rounded-xl bg-indigo-600 px-6 py-3 font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+            className="rounded-xl bg-indigo-600 px-6 py-3 font-medium text-white hover:bg-indigo-500 disabled:opacity-50 sm:self-end"
           >
             {isLoading ? 'Consulting...' : 'Send'}
           </button>

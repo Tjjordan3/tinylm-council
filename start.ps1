@@ -16,6 +16,21 @@ function Test-PortInUse($Port) {
     return $null -ne $connections
 }
 
+function Get-TailscaleIPv4 {
+    if (-not (Get-Command tailscale -ErrorAction SilentlyContinue)) {
+        return $null
+    }
+    try {
+        $ip = & tailscale ip -4 2>$null
+        if ($ip -is [string] -and $ip.Trim()) {
+            return $ip.Trim()
+        }
+    } catch {
+        return $null
+    }
+    return $null
+}
+
 function Start-Backend {
     if (Test-PortInUse 8001) {
         Write-Host "WARNING: Port 8001 is already in use. Backend may already be running."
@@ -42,10 +57,18 @@ if (Test-PortInUse 5173) {
     $frontend = Start-Process -FilePath $npm -ArgumentList "run", "dev" -WorkingDirectory "$PSScriptRoot\frontend" -PassThru -NoNewWindow
 }
 
+$tailscaleIp = Get-TailscaleIPv4
+
 Write-Host ""
 Write-Host "TinyLM Council is starting:"
-Write-Host "  Frontend: http://localhost:5173"
+Write-Host "  PC:       http://localhost:5173"
 Write-Host "  Backend:  http://localhost:8001"
+if ($tailscaleIp) {
+    Write-Host "  Mobile:   http://${tailscaleIp}:5173  (Tailscale — phone on same tailnet)"
+    Write-Host "            Add to Home Screen in your phone browser for a PWA shortcut."
+} else {
+    Write-Host "  Mobile:   Install Tailscale on PC and phone, then open http://<pc-tailscale-ip>:5173"
+}
 Write-Host ""
 Write-Host "Press Ctrl+C to stop."
 

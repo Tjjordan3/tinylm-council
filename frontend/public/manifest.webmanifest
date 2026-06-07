@@ -1,0 +1,17 @@
+{
+  "name": "TinyLM Council",
+  "short_name": "TinyLM",
+  "description": "Small-model LLM deliberation council",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f1117",
+  "theme_color": "#4f46e5",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

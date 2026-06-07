@@ -14,6 +14,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [settings, setSettings] = useState(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -220,12 +221,36 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-[#0f1117]">
+      <div className="fixed inset-x-0 top-0 z-30 flex h-12 items-center border-b border-gray-800 bg-[#0f1117] px-3 md:hidden">
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(true)}
+          className="rounded-md p-2 text-gray-300 hover:bg-gray-800 hover:text-white"
+          aria-label="Open menu"
+        >
+          ☰
+        </button>
+        <span className="ml-2 font-semibold text-white">TinyLM Council</span>
+      </div>
+
+      {sidebarOpen && (
+        <button
+          type="button"
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          aria-label="Close menu"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       <Sidebar
         conversations={conversations}
         currentConversationId={currentConversationId}
         onSelectConversation={setCurrentConversationId}
         onNewConversation={handleNewConversation}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
       />
+      <div className="flex min-w-0 flex-1 flex-col pt-12 md:pt-0">
       <Routes>
         <Route
           path="/"
@@ -261,6 +286,7 @@ export default function App() {
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </div>
     </div>
   );
 }
