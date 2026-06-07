@@ -4,6 +4,8 @@ All notable changes to TinyLM Council are documented here.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-07
+
 ### Added
 
 - **Web pre-search (Option A)** — optional per-message "Search the web first" checkbox; runs one Serper search before Stage 1 and injects snippets into all council prompts
@@ -48,5 +50,6 @@ All notable changes to TinyLM Council are documented here.
 - Windows launcher (`start.ps1`)
 - LM Studio council reliability improvements
 
+[0.3.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.1.0
