@@ -157,13 +157,27 @@ async def stage2_collect_rankings(
     any_parse_failed = False
     stage2_results = []
 
+    successful_member_ids = {result.get("member_id") for result in stage1_results}
+    ranking_members = [m for m in members if m.id in successful_member_ids]
+    if not ranking_members:
+        ranking_members = members
+
     async def rank_member(member: CouncilMember) -> Optional[Dict[str, Any]]:
         nonlocal any_parse_failed
         response = await _complete_with_limits(
             registry, member, messages, "stage2", profile
         )
         if response.error:
-            return None
+            return {
+                "member_id": member.id,
+                "model": member.model,
+                "display_name": _member_label(member),
+                "provider_id": member.provider_id,
+                "ranking": "",
+                "parsed_ranking": [],
+                "parse_failed": True,
+                "error": response.error,
+            }
         full_text = response.content
         parsed, parse_failed = parse_ranking_with_fallback(full_text, available_labels)
         if parse_failed:
@@ -176,9 +190,10 @@ async def stage2_collect_rankings(
             "ranking": full_text,
             "parsed_ranking": parsed,
             "parse_failed": parse_failed,
+            "error": None,
         }
 
-    completed = await asyncio.gather(*[rank_member(member) for member in members])
+    completed = await asyncio.gather(*[rank_member(member) for member in ranking_members])
     stage2_results = [result for result in completed if result is not None]
     return stage2_results, label_to_model, any_parse_failed
 

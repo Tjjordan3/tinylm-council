@@ -124,6 +124,24 @@ class ProviderRegistry:
             return LMStudioNativeClient(config)
         return None
 
+    async def ensure_model_ready(self, member: CouncilMember) -> Optional[str]:
+        """Load model into memory for LM Studio before inference."""
+        config = self.settings.get_provider(member.provider_id)
+        if not config or (config.preset or "").lower() != "lmstudio":
+            return None
+
+        native = self.get_native_client(member.provider_id)
+        if not native or not hasattr(native, "load_model"):
+            return None
+
+        result = await native.load_model(member.model)
+        if result.get("error"):
+            error = result["error"]
+            if "native API not available" in error:
+                return None
+            return error
+        return None
+
     async def complete_member(
         self,
         member: CouncilMember,
@@ -140,10 +158,26 @@ class ProviderRegistry:
                 content="",
                 error=f"Provider '{member.provider_id}' not found",
             )
-        return await provider.complete(
+
+        load_error = await self.ensure_model_ready(member)
+        if load_error:
+            return CompletionResult(
+                content="",
+                error=f"Could not load {member.model} in LM Studio: {load_error}",
+            )
+
+        result = await provider.complete(
             member.model,
             messages,
             timeout=timeout,
             max_tokens=max_tokens,
             temperature=temperature,
         )
+
+        if not result.error and not (result.content or "").strip():
+            return CompletionResult(
+                content="",
+                error=f"Model {member.display_name or member.model} returned an empty response",
+            )
+
+        return result

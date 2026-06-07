@@ -8,7 +8,7 @@ from typing import Any, Dict, List
 STAGE_LIMITS = {
     "tiny": {
         "stage1": {"max_tokens": 400, "temperature": 0.7},
-        "stage2": {"max_tokens": 80, "temperature": 0.2},
+        "stage2": {"max_tokens": 128, "temperature": 0.2},
         "stage3": {"max_tokens": 700, "temperature": 0.5},
         "title": {"max_tokens": 15, "temperature": 0.3},
     },

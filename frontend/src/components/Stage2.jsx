@@ -22,6 +22,9 @@ export default function Stage2({
 
   if (!rankings || rankings.length === 0) return null;
 
+  const hasContent = rankings.some((rank) => (rank.ranking || '').trim());
+  const hasErrors = rankings.some((rank) => rank.error);
+
   return (
     <div className="mb-4 rounded-lg border border-gray-800 bg-[#12141c]">
       <button
@@ -37,6 +40,21 @@ export default function Stage2({
           <p className="mt-3 text-sm text-gray-400">
             Each member evaluated anonymized responses and ranked them. Names are shown for readability.
           </p>
+
+          {(!hasContent || hasErrors) && (
+            <div className="mt-3 rounded-md bg-amber-900/20 px-3 py-2 text-sm text-amber-300">
+              {!hasContent
+                ? 'Rankings came back empty. With LM Studio, ensure each council model is installed and the server is running. Try reloading models in LM Studio or use fewer council members.'
+                : 'Some members failed to rank responses.'}
+              {rankings
+                .filter((rank) => rank.error)
+                .map((rank) => (
+                  <div key={rank.member_id} className="mt-1 text-xs">
+                    {rank.display_name || rank.model}: {rank.error}
+                  </div>
+                ))}
+            </div>
+          )}
 
           {rankingParseFailed && (
             <div className="mt-3 rounded-md bg-amber-900/20 px-3 py-2 text-sm text-amber-300">
@@ -77,9 +95,13 @@ export default function Stage2({
           </div>
 
           <div className="mt-3 rounded-md bg-[#0f1117] p-4 markdown-body text-sm text-gray-200">
-            <ReactMarkdown>
-              {deAnonymizeText(rankings[activeTab].ranking, labelToModel)}
-            </ReactMarkdown>
+            {(rankings[activeTab].ranking || '').trim() ? (
+              <ReactMarkdown>
+                {deAnonymizeText(rankings[activeTab].ranking, labelToModel)}
+              </ReactMarkdown>
+            ) : (
+              <span className="text-gray-500 italic">No ranking text returned.</span>
+            )}
           </div>
         </div>
       )}
