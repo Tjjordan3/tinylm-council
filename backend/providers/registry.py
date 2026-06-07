@@ -6,6 +6,7 @@ from typing import Dict, List, Optional
 
 from .base import (
     AppSettings,
+    CompletionResult,
     CouncilMember,
     LLMProvider,
     ProviderCapabilities,
@@ -152,8 +153,6 @@ class ProviderRegistry:
     ):
         provider = self.get_provider(member.provider_id)
         if not provider:
-            from .base import CompletionResult
-
             return CompletionResult(
                 content="",
                 error=f"Provider '{member.provider_id}' not found",
