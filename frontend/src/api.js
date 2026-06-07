@@ -74,7 +74,7 @@ export const api = {
     }
   },
 
-  async sendMessageStream(conversationId, content, onEvent, { signal } = {}) {
+  async sendMessageStream(conversationId, content, onEvent, { signal, useWebSearch = false } = {}) {
     let reader;
     try {
       const response = await fetch(
@@ -82,7 +82,7 @@ export const api = {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content }),
+          body: JSON.stringify({ content, use_web_search: useWebSearch }),
           signal,
         }
       );

@@ -94,11 +94,12 @@ npm run build
 cd ..
 ```
 
-Optional cloud models:
+Optional cloud models and web search:
 
 ```bash
 cp .env.example .env
 # Edit .env — set OPENROUTER_API_KEY if needed
+# Optional web search: SERPER_API_KEY from https://serper.dev (2500 free/month)
 ```
 
 ## 3. Configure Ollama URLs
@@ -221,6 +222,13 @@ Add to Home Screen for a PWA shortcut.
 4. Save and ask a short test question.
 
 Use **Stop** if a run hangs. Only one council run at a time.
+
+### Web search (optional)
+
+1. Add `SERPER_API_KEY=...` to `.env` (free key at [serper.dev](https://serper.dev)).
+2. Restart the backend (`sudo systemctl restart tinylm-council`).
+3. Check **Search the web first** when sending a question in the UI.
+4. Test the API: `curl -X POST http://localhost:8001/api/web-search/test`
 
 ## 8. Remote Ollama (optional)
 

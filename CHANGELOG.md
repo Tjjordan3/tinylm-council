@@ -2,6 +2,15 @@
 
 All notable changes to TinyLM Council are documented here.
 
+## [Unreleased]
+
+### Added
+
+- **Web pre-search (Option A)** — optional per-message "Search the web first" checkbox; runs one Serper search before Stage 1 and injects snippets into all council prompts
+- **Web sources panel** — collapsible UI showing search results and links
+- **`POST /api/web-search/test`** — verify Serper API key configuration
+- Pluggable `backend/web_search.py` provider interface (Serper shipped first)
+
 ## [0.2.0] - 2026-06-07
 
 ### Added

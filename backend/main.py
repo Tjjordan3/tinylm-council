@@ -32,6 +32,12 @@ from .model_manager import (
     pull_model_stream,
     unload_model,
 )
+from .web_search import (
+    WebSearchResult,
+    is_web_search_configured,
+    search_web,
+    web_search_metadata,
+)
 from .providers.registry import ProviderRegistry
 from .settings import (
     add_council_member,
@@ -86,6 +92,7 @@ def refresh_registry() -> ProviderRegistry:
 
 class SendMessageRequest(BaseModel):
     content: str
+    use_web_search: bool = False
 
 
 class ProviderTestRequest(BaseModel):
@@ -241,6 +248,23 @@ async def create_council_member(request: AddMemberRequest):
     }
 
 
+@app.post("/api/web-search/test")
+async def test_web_search():
+    if not is_web_search_configured():
+        return {
+            "ok": False,
+            "message": "Set SERPER_API_KEY in .env (free key at https://serper.dev)",
+        }
+    result = await search_web("current date and time UTC", "tiny")
+    if result.error:
+        return {"ok": False, "message": result.error}
+    return {
+        "ok": True,
+        "message": f"Web search OK ({len(result.sources)} results)",
+        "sample_source": result.sources[0] if result.sources else None,
+    }
+
+
 @app.get("/api/conversations")
 async def list_conversations():
     return storage.list_conversations()
@@ -297,9 +321,30 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                     _rollback_user_message(conversation_id, user_saved, assistant_saved)
                     return
 
+                web_context = ""
+                web_search_info: Optional[Dict[str, Any]] = None
+
+                if request.use_web_search:
+                    yield f"data: {json.dumps({'type': 'web_search_start'})}\n\n"
+                    if not is_web_search_configured():
+                        skip_message = "Set SERPER_API_KEY in .env (free key at https://serper.dev)"
+                        skipped = WebSearchResult(query=request.content, error=skip_message)
+                        web_search_info = web_search_metadata(skipped, enabled=True)
+                        yield f"data: {json.dumps({'type': 'web_search_skipped', 'message': skip_message, 'data': web_search_info})}\n\n"
+                    else:
+                        search_result = await search_web(request.content, profile)
+                        web_search_info = web_search_metadata(search_result, enabled=True)
+                        if search_result.error or not search_result.context_text:
+                            yield f"data: {json.dumps({'type': 'web_search_skipped', 'message': search_result.error or 'No results', 'data': web_search_info})}\n\n"
+                        else:
+                            web_context = search_result.context_text
+                            yield f"data: {json.dumps({'type': 'web_search_complete', 'data': web_search_info})}\n\n"
+
                 yield f"data: {json.dumps({'type': 'stage1_start', 'members': [{'id': m.id, 'display_name': m.display_name, 'model': m.model} for m in members]})}\n\n"
 
-                stage1_messages = build_stage1_messages(request.content, profile)
+                stage1_messages = build_stage1_messages(
+                    request.content, profile, web_context=web_context
+                )
                 all_stage1: List[dict] = []
 
                 async def query_and_track(member):
@@ -334,7 +379,12 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                 yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
                 async for item in _iter_with_keepalive(
                     stage2_collect_rankings(
-                        registry, members, request.content, stage1_results, profile
+                        registry,
+                        members,
+                        request.content,
+                        stage1_results,
+                        profile,
+                        web_context=web_context,
                     )
                 ):
                     if item is None:
@@ -359,6 +409,7 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                         stage2_results,
                         aggregate_rankings,
                         profile,
+                        web_context=web_context,
                     )
                 ):
                     if item is None:
@@ -378,6 +429,8 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                         if not r.get("success")
                     ],
                 }
+                if web_search_info is not None:
+                    metadata["web_search"] = web_search_info
 
                 if title_task:
                     title = await title_task

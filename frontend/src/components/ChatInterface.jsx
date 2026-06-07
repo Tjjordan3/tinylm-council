@@ -3,6 +3,7 @@ import Stage1 from './Stage1';
 import Stage2 from './Stage2';
 import Stage3 from './Stage3';
 import StageProgress from './StageProgress';
+import WebSources from './WebSources';
 
 function providerBadge(providerId, settings) {
   const provider = settings?.providers?.find((p) => p.id === providerId);
@@ -20,6 +21,7 @@ export default function ChatInterface({
   settings,
 }) {
   const [input, setInput] = useState('');
+  const [useWebSearch, setUseWebSearch] = useState(false);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -29,7 +31,7 @@ export default function ChatInterface({
   const handleSubmit = (e) => {
     e.preventDefault();
     if (input.trim() && !isLoading) {
-      onSendMessage(input);
+      onSendMessage(input, useWebSearch);
       setInput('');
     }
   };
@@ -102,6 +104,11 @@ export default function ChatInterface({
                     memberStatuses={msg.memberStatuses}
                   />
 
+                  <WebSources
+                    webSearch={msg.webSearch || msg.metadata?.web_search}
+                    loading={msg.loading}
+                  />
+
                   <Stage1
                     responses={msg.stage1}
                     allResults={msg.allStage1}
@@ -126,7 +133,7 @@ export default function ChatInterface({
       </div>
 
       <div className="border-t border-gray-800 p-3 md:p-4">
-        <form onSubmit={handleSubmit} className="mx-auto flex max-w-4xl flex-col gap-3 sm:flex-row">
+        <form onSubmit={handleSubmit} className="mx-auto flex max-w-4xl flex-col gap-3">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -136,7 +143,17 @@ export default function ChatInterface({
             placeholder="Ask the council a question..."
             className="flex-1 resize-none rounded-xl border border-gray-700 bg-[#12141c] px-4 py-3 text-gray-100 placeholder-gray-500 focus:border-indigo-500 focus:outline-none disabled:opacity-50"
           />
-          <div className="flex flex-col gap-3 sm:flex-row sm:self-end">
+          <label className="flex items-center gap-2 text-sm text-gray-400">
+            <input
+              type="checkbox"
+              checked={useWebSearch}
+              onChange={(e) => setUseWebSearch(e.target.checked)}
+              disabled={isLoading}
+              className="rounded border-gray-600"
+            />
+            Search the web first
+          </label>
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
             {isLoading && (
               <button
                 type="button"

@@ -24,7 +24,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 | **Tiny** (default) | 0.5–4B local models | Short prompts, token limits, trimmed context, simpler `RANK:` format |
 | **Standard** | Cloud / large models | Original longer prompts and full context |
 
-Switch profiles in **Settings**.
+Switch profiles in **Settings**. Optional **Search the web first** (per message) uses [Serper](https://serper.dev) — set `SERPER_API_KEY` in `.env`.
 
 ## Supported providers
 

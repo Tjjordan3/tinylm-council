@@ -85,11 +85,19 @@ copy .env.example .env
 
 Edit `.env` and set `OPENROUTER_API_KEY` if you use OpenRouter.
 
+For **web search** (optional), add a free [Serper](https://serper.dev) API key:
+
+```env
+SERPER_API_KEY=your-key-here
+```
+
 ### 5. Run
 
 ```powershell
 .\start.ps1
 ```
+
+Run from **PowerShell** in the project folder. Use `.\start.ps1` (not `start start.ps1` — that opens the file in Notepad).
 
 Open **http://localhost:5173** in your browser.
 
@@ -132,6 +140,7 @@ Inference still runs on the PC (or wherever your Ollama server is configured). T
 - **Stop button** — appears while a consultation runs; cancels the current council and clears partial results.
 - **One at a time** — wait for a run to finish (or stop it) before sending another question.
 - **Failed models** — one bad model does not stop the council; remove unreliable models in Settings.
+- **Web search** — check **Search the web first** before sending; requires `SERPER_API_KEY` in `.env` ([serper.dev](https://serper.dev), ~2,500 free searches/month). Sources show in the **Web sources** panel. Council still runs if the key is missing (with a warning).
 
 ## Manual start (without start.ps1)
 
@@ -165,6 +174,9 @@ npm run dev
 | Stage 1 missing in UI | Refresh the page or reopen the conversation |
 | `start.ps1` parse error | Update to latest `main` — Unicode dash issue was fixed |
 | Mobile can't connect | Check Tailscale on both devices; allow firewall on port 5173 |
+| `npm` not found | Install Node.js LTS from [nodejs.org](https://nodejs.org), reopen PowerShell |
+| `start.ps1` opens Notepad | Run `.\start.ps1` in PowerShell, not `start start.ps1` |
+| Web search skipped | Add `SERPER_API_KEY` to `.env` and restart the app |
 
 ## Data location
 

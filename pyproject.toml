@@ -1,6 +1,6 @@
 [project]
 name = "tinylm-council"
-version = "0.2.0"
+version = "0.3.0"
 description = "TinyLM Council - multi-LLM deliberation for small local models"
 readme = "README.md"
 requires-python = ">=3.10"

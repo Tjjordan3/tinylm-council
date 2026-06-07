@@ -97,7 +97,7 @@ export default function App() {
     abortControllerRef.current?.abort();
   };
 
-  const handleSendMessage = async (content) => {
+  const handleSendMessage = async (content, useWebSearch = false) => {
     if (!currentConversationId) return;
     setIsLoading(true);
 
@@ -117,8 +117,14 @@ export default function App() {
         stage2: null,
         stage3: null,
         metadata: null,
+        webSearch: null,
         memberStatuses: {},
-        loading: { stage1: false, stage2: false, stage3: false },
+        loading: {
+          webSearch: useWebSearch,
+          stage1: false,
+          stage2: false,
+          stage3: false,
+        },
       };
 
       setCurrentConversation((prev) => ({
@@ -133,6 +139,43 @@ export default function App() {
         content,
         (eventType, event) => {
         switch (eventType) {
+          case 'web_search_start':
+            setCurrentConversation((prev) =>
+              updateLastAssistantMessage(prev, {
+                loading: {
+                  ...(prev.messages[prev.messages.length - 1].loading || {}),
+                  webSearch: true,
+                },
+              })
+            );
+            break;
+          case 'web_search_complete':
+            setCurrentConversation((prev) =>
+              updateLastAssistantMessage(prev, {
+                webSearch: event.data,
+                loading: {
+                  ...(prev.messages[prev.messages.length - 1].loading || {}),
+                  webSearch: false,
+                },
+              })
+            );
+            break;
+          case 'web_search_skipped':
+            setCurrentConversation((prev) =>
+              updateLastAssistantMessage(prev, {
+                webSearch: event.data || {
+                  enabled: true,
+                  query: content,
+                  sources: [],
+                  error: event.message,
+                },
+                loading: {
+                  ...(prev.messages[prev.messages.length - 1].loading || {}),
+                  webSearch: false,
+                },
+              })
+            );
+            break;
           case 'stage1_start':
             setCurrentConversation((prev) => {
               const memberStatuses = {};
@@ -140,7 +183,7 @@ export default function App() {
                 memberStatuses[m.id] = { status: 'waiting', ...m };
               }
               return updateLastAssistantMessage(prev, {
-                loading: { stage1: true, stage2: false, stage3: false },
+                loading: { webSearch: false, stage1: true, stage2: false, stage3: false },
                 memberStatuses,
               });
             });
@@ -237,7 +280,7 @@ export default function App() {
             break;
         }
       },
-        { signal: controller.signal }
+        { signal: controller.signal, useWebSearch }
       );
 
       if (streamResult.aborted) {

@@ -107,8 +107,9 @@ async def stage1_collect_responses(
     user_query: str,
     profile: str,
     on_member_complete: Optional[Callable[[Dict[str, Any]], None]] = None,
+    web_context: str = "",
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    messages = build_stage1_messages(user_query, profile)
+    messages = build_stage1_messages(user_query, profile, web_context=web_context)
     all_results: List[Dict[str, Any]] = []
 
     async def query_member(member: CouncilMember) -> Dict[str, Any]:
@@ -140,6 +141,7 @@ async def stage2_collect_rankings(
     user_query: str,
     stage1_results: List[Dict[str, Any]],
     profile: str,
+    web_context: str = "",
 ) -> Tuple[List[Dict[str, Any]], Dict[str, str], bool]:
     stage1_input = stage1_results
     if profile == "tiny":
@@ -152,7 +154,9 @@ async def stage2_collect_rankings(
         for label, result in zip(labels, stage1_input)
     }
 
-    ranking_prompt = build_stage2_prompt(user_query, stage1_input, labels, profile)
+    ranking_prompt = build_stage2_prompt(
+        user_query, stage1_input, labels, profile, web_context=web_context
+    )
     messages = [{"role": "user", "content": ranking_prompt}]
     any_parse_failed = False
     stage2_results = []
@@ -209,6 +213,7 @@ async def stage3_synthesize_final(
     stage2_results: List[Dict[str, Any]],
     aggregate_rankings: List[Dict[str, Any]],
     profile: str,
+    web_context: str = "",
 ) -> Dict[str, Any]:
     stage1_input = stage1_results
     if profile == "tiny":
@@ -229,7 +234,7 @@ async def stage3_synthesize_final(
         )
 
     chairman_prompt = build_stage3_prompt(
-        user_query, stage1_input, stage2_summary, profile
+        user_query, stage1_input, stage2_summary, profile, web_context=web_context
     )
     messages = [{"role": "user", "content": chairman_prompt}]
     response = await _complete_with_limits(

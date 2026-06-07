@@ -26,16 +26,31 @@ def get_stage_limits(profile: str, stage: str) -> Dict[str, Any]:
     return STAGE_LIMITS[profile_key].get(stage, {})
 
 
-def build_stage1_messages(user_query: str, profile: str) -> List[Dict[str, str]]:
+def format_web_context_block(web_context: str) -> str:
+    if not web_context or not web_context.strip():
+        return ""
+    return (
+        "Web search results (may be incomplete or outdated):\n"
+        f"{web_context.strip()}\n\n"
+        "Use web results if relevant; do not invent sources.\n\n"
+    )
+
+
+def build_stage1_messages(
+    user_query: str, profile: str, web_context: str = ""
+) -> List[Dict[str, str]]:
+    web_block = format_web_context_block(web_context)
+    user_content = f"{web_block}Question: {user_query}" if web_block else user_query
+
     if profile == "tiny":
         return [
             {
                 "role": "system",
                 "content": "Answer in 2-5 sentences. Be direct and accurate.",
             },
-            {"role": "user", "content": user_query},
+            {"role": "user", "content": user_content},
         ]
-    return [{"role": "user", "content": user_query}]
+    return [{"role": "user", "content": user_content}]
 
 
 def build_stage2_prompt(
@@ -43,6 +58,7 @@ def build_stage2_prompt(
     stage1_results: List[Dict[str, Any]],
     labels: List[str],
     profile: str,
+    web_context: str = "",
 ) -> str:
     responses_text = "\n\n".join(
         f"Response {label}:\n{result['response']}"
@@ -50,11 +66,12 @@ def build_stage2_prompt(
     )
     label_list = ", ".join(f"Response {label}" for label in labels)
     example_rank = ",".join(reversed(labels)) if labels else "A,B"
+    web_block = format_web_context_block(web_context)
 
     if profile == "tiny":
         return f"""Question: {user_query}
 
-{responses_text}
+{web_block}{responses_text}
 
 Rank these responses from best to worst ({label_list}).
 Reply with ONE line only in this exact format:
@@ -64,7 +81,7 @@ RANK: {example_rank}"""
 
 Question: {user_query}
 
-Here are the responses from different models (anonymized):
+{web_block}Here are the responses from different models (anonymized):
 
 {responses_text}
 
@@ -97,18 +114,20 @@ def build_stage3_prompt(
     stage1_results: List[Dict[str, Any]],
     stage2_summary: str,
     profile: str,
+    web_context: str = "",
 ) -> str:
     stage1_text = "\n\n".join(
         f"{result.get('display_name') or result['model']}:\n{result['response']}"
         for result in stage1_results
     )
+    web_block = format_web_context_block(web_context)
 
     if profile == "tiny":
         return f"""You are the Chairman. Combine the best parts of these answers into one clear reply.
 
 Question: {user_query}
 
-Answers:
+{web_block}Answers:
 {stage1_text}
 
 Peer rankings:
@@ -120,7 +139,7 @@ Write one helpful final answer:"""
 
 Original Question: {user_query}
 
-STAGE 1 - Individual Responses:
+{web_block}STAGE 1 - Individual Responses:
 {stage1_text}
 
 STAGE 2 - Peer Rankings:
