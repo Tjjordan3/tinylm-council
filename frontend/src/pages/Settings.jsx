@@ -122,22 +122,22 @@ export default function Settings({ settings: initialSettings, onSave }) {
   };
 
   return (
-    <main className="flex-1 overflow-y-auto p-8">
+    <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8">
       <div className="mx-auto max-w-4xl">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-white">Settings</h1>
             <p className="mt-1 text-gray-400">Configure providers and your council</p>
           </div>
           <button
             onClick={handleSave}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-500"
+            className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-500 sm:w-auto"
           >
             {saved ? 'Saved!' : 'Save changes'}
           </button>
         </div>
 
-        <section className="mt-8 rounded-xl border border-gray-800 bg-[#12141c] p-6">
+        <section className="mt-6 rounded-xl border border-gray-800 bg-[#12141c] p-4 md:p-6">
           <h2 className="text-lg font-medium text-white">Council profile</h2>
           <p className="mt-1 text-sm text-gray-400">
             Tiny profile uses shorter prompts and token limits for 0.5–4B local models.
@@ -159,7 +159,7 @@ export default function Settings({ settings: initialSettings, onSave }) {
           </div>
         </section>
 
-        <section className="mt-6 rounded-xl border border-gray-800 bg-[#12141c] p-6">
+        <section className="mt-6 rounded-xl border border-gray-800 bg-[#12141c] p-4 md:p-6">
           <h2 className="text-lg font-medium text-white">Council presets</h2>
           <div className="mt-3 flex flex-wrap gap-2">
             <button
@@ -177,13 +177,13 @@ export default function Settings({ settings: initialSettings, onSave }) {
           </div>
         </section>
 
-        <section className="mt-6 rounded-xl border border-gray-800 bg-[#12141c] p-6">
+        <section className="mt-6 rounded-xl border border-gray-800 bg-[#12141c] p-4 md:p-6">
           <h2 className="text-lg font-medium text-white">Providers</h2>
           <div className="mt-4 space-y-4">
             {settings.providers.map((provider, index) => (
               <div key={provider.id} className="rounded-lg border border-gray-700 p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 space-y-2">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 flex-1 space-y-2">
                     <input
                       value={provider.name}
                       onChange={(e) => updateProvider(index, 'name', e.target.value)}
@@ -195,16 +195,16 @@ export default function Settings({ settings: initialSettings, onSave }) {
                       className="w-full rounded-md border border-gray-700 bg-[#0f1117] px-3 py-2 text-sm text-gray-300"
                     />
                   </div>
-                  <div className="flex flex-col gap-2">
+                  <div className="flex shrink-0 gap-2">
                     <button
                       onClick={() => testProvider(provider)}
-                      className="rounded-md bg-gray-800 px-3 py-1.5 text-sm text-gray-200 hover:bg-gray-700"
+                      className="flex-1 rounded-md bg-gray-800 px-3 py-1.5 text-sm text-gray-200 hover:bg-gray-700 sm:flex-none"
                     >
                       Test
                     </button>
                     <button
                       onClick={() => removeProvider(provider.id)}
-                      className="rounded-md bg-red-900/30 px-3 py-1.5 text-sm text-red-300 hover:bg-red-900/50"
+                      className="flex-1 rounded-md bg-red-900/30 px-3 py-1.5 text-sm text-red-300 hover:bg-red-900/50 sm:flex-none"
                     >
                       Remove
                     </button>
@@ -241,21 +241,21 @@ export default function Settings({ settings: initialSettings, onSave }) {
           </div>
         </section>
 
-        <section className="mt-6 rounded-xl border border-gray-800 bg-[#12141c] p-6">
+        <section className="mt-6 rounded-xl border border-gray-800 bg-[#12141c] p-4 md:p-6">
           <h2 className="text-lg font-medium text-white">Council members</h2>
           <div className="mt-4 space-y-3">
             {settings.council_members.map((member) => (
               <div
                 key={member.id}
-                className="flex items-center justify-between rounded-lg border border-gray-700 px-4 py-3"
+                className="rounded-lg border border-gray-700 px-4 py-3"
               >
-                <div>
-                  <div className="font-medium text-white">{member.display_name}</div>
-                  <div className="text-xs text-gray-500">
+                <div className="min-w-0">
+                  <div className="break-words font-medium text-white">{member.display_name}</div>
+                  <div className="mt-1 break-all text-xs text-gray-500">
                     {member.model} · {member.provider_id}
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-gray-800 pt-3">
                   <label className="flex items-center gap-2 text-sm text-gray-300">
                     <input
                       type="radio"
@@ -288,11 +288,11 @@ export default function Settings({ settings: initialSettings, onSave }) {
 
           {settings.providers.map((provider) => (
             <div key={provider.id} className="mt-4 rounded-lg border border-gray-700 p-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-sm text-gray-300">Add from {provider.name}</span>
                 <button
                   onClick={() => loadModels(provider.id)}
-                  className="text-sm text-indigo-400 hover:text-indigo-300"
+                  className="text-left text-sm text-indigo-400 hover:text-indigo-300 sm:text-right"
                 >
                   Load models
                 </button>

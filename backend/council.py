@@ -193,8 +193,11 @@ async def stage2_collect_rankings(
             "error": None,
         }
 
-    completed = await asyncio.gather(*[rank_member(member) for member in ranking_members])
-    stage2_results = [result for result in completed if result is not None]
+    stage2_results = []
+    for coro in asyncio.as_completed([rank_member(member) for member in ranking_members]):
+        result = await coro
+        if result is not None:
+            stage2_results.append(result)
     return stage2_results, label_to_model, any_parse_failed
 
 
@@ -261,13 +264,13 @@ async def generate_conversation_title(
         return "New Conversation"
 
     messages = [{"role": "user", "content": build_title_prompt(user_query)}]
-    limits = get_stage_limits(profile, "title")
-    response = await registry.complete_member(
+    response = await _complete_with_limits(
+        registry,
         title_member,
         messages,
+        "title",
+        profile,
         timeout=30.0,
-        max_tokens=limits.get("max_tokens"),
-        temperature=limits.get("temperature"),
     )
     if response.error or not response.content:
         return "New Conversation"

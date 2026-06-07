@@ -55,6 +55,23 @@ app.add_middleware(
 
 _registry = ProviderRegistry(load_settings())
 _registry.refresh(load_settings())
+_council_lock = asyncio.Lock()
+KEEPALIVE_INTERVAL = 12.0
+
+
+async def _iter_with_keepalive(awaitable, interval: float = KEEPALIVE_INTERVAL):
+    """Yield None for keepalive ticks while waiting on a long council step."""
+    task = asyncio.create_task(awaitable)
+    while not task.done():
+        done, _ = await asyncio.wait({task}, timeout=interval)
+        if not done:
+            yield None
+    yield await task
+
+
+def _rollback_user_message(conversation_id: str, user_saved: bool, assistant_saved: bool) -> None:
+    if user_saved and not assistant_saved:
+        storage.remove_last_user_message(conversation_id)
 
 
 def get_registry() -> ProviderRegistry:
@@ -257,100 +274,130 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
     chairman = settings.get_chairman()
 
     async def event_generator():
-        try:
-            storage.add_user_message(conversation_id, request.content)
+        user_saved = False
+        assistant_saved = False
 
+        if _council_lock.locked():
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Council is busy with another request. Please wait for it to finish.'})}\n\n"
+            return
+
+        async with _council_lock:
             title_task = None
-            if is_first_message:
-                title_task = asyncio.create_task(
-                    generate_conversation_title(registry, request.content, profile)
-                )
+            try:
+                storage.add_user_message(conversation_id, request.content)
+                user_saved = True
 
-            if len(members) < 2:
-                yield f"data: {json.dumps({'type': 'error', 'message': 'At least 2 enabled council members required. Configure in Settings.'})}\n\n"
-                return
+                if is_first_message:
+                    title_task = asyncio.create_task(
+                        generate_conversation_title(registry, request.content, profile)
+                    )
 
-            yield f"data: {json.dumps({'type': 'stage1_start', 'members': [{'id': m.id, 'display_name': m.display_name, 'model': m.model} for m in members]})}\n\n"
+                if len(members) < 2:
+                    yield f"data: {json.dumps({'type': 'error', 'message': 'At least 2 enabled council members required. Configure in Settings.'})}\n\n"
+                    _rollback_user_message(conversation_id, user_saved, assistant_saved)
+                    return
 
-            stage1_messages = build_stage1_messages(request.content, profile)
-            all_stage1: List[dict] = []
+                yield f"data: {json.dumps({'type': 'stage1_start', 'members': [{'id': m.id, 'display_name': m.display_name, 'model': m.model} for m in members]})}\n\n"
 
-            async def query_and_track(member):
-                response = await _complete_with_limits(
-                    registry, member, stage1_messages, "stage1", profile
-                )
-                result = {
-                    "member_id": member.id,
-                    "model": member.model,
-                    "display_name": _member_label(member),
-                    "provider_id": member.provider_id,
-                    "response": response.content if not response.error else "",
-                    "error": response.error,
-                    "success": response.error is None,
+                stage1_messages = build_stage1_messages(request.content, profile)
+                all_stage1: List[dict] = []
+
+                async def query_and_track(member):
+                    response = await _complete_with_limits(
+                        registry, member, stage1_messages, "stage1", profile
+                    )
+                    result = {
+                        "member_id": member.id,
+                        "model": member.model,
+                        "display_name": _member_label(member),
+                        "provider_id": member.provider_id,
+                        "response": response.content if not response.error else "",
+                        "error": response.error,
+                        "success": response.error is None,
+                    }
+                    all_stage1.append(result)
+                    return result
+
+                tasks = [query_and_track(m) for m in members]
+                for coro in asyncio.as_completed(tasks):
+                    result = await coro
+                    yield f"data: {json.dumps({'type': 'member_complete', 'data': result})}\n\n"
+
+                stage1_results = [r for r in all_stage1 if r.get("success")]
+                yield f"data: {json.dumps({'type': 'stage1_complete', 'data': stage1_results, 'all_results': all_stage1})}\n\n"
+
+                if not stage1_results:
+                    yield f"data: {json.dumps({'type': 'error', 'message': 'All council members failed to respond.'})}\n\n"
+                    _rollback_user_message(conversation_id, user_saved, assistant_saved)
+                    return
+
+                yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
+                async for item in _iter_with_keepalive(
+                    stage2_collect_rankings(
+                        registry, members, request.content, stage1_results, profile
+                    )
+                ):
+                    if item is None:
+                        yield ": keepalive\n\n"
+                    else:
+                        stage2_results, label_to_model, ranking_parse_failed = item
+                aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
+                yield f"data: {json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings, 'ranking_parse_failed': ranking_parse_failed}})}\n\n"
+
+                yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
+                if not chairman:
+                    yield f"data: {json.dumps({'type': 'error', 'message': 'No chairman configured.'})}\n\n"
+                    _rollback_user_message(conversation_id, user_saved, assistant_saved)
+                    return
+
+                async for item in _iter_with_keepalive(
+                    stage3_synthesize_final(
+                        registry,
+                        chairman,
+                        request.content,
+                        stage1_results,
+                        stage2_results,
+                        aggregate_rankings,
+                        profile,
+                    )
+                ):
+                    if item is None:
+                        yield ": keepalive\n\n"
+                    else:
+                        stage3_result = item
+                yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
+
+                metadata = {
+                    "label_to_model": label_to_model,
+                    "aggregate_rankings": aggregate_rankings,
+                    "ranking_parse_failed": ranking_parse_failed,
+                    "council_profile": profile,
+                    "failed_members": [
+                        r.get("display_name")
+                        for r in all_stage1
+                        if not r.get("success")
+                    ],
                 }
-                all_stage1.append(result)
-                return result
 
-            tasks = [query_and_track(m) for m in members]
-            for coro in asyncio.as_completed(tasks):
-                result = await coro
-                yield f"data: {json.dumps({'type': 'member_complete', 'data': result})}\n\n"
+                if title_task:
+                    title = await title_task
+                    storage.update_conversation_title(conversation_id, title)
+                    yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
 
-            stage1_results = [r for r in all_stage1 if r.get("success")]
+                storage.add_assistant_message(
+                    conversation_id, stage1_results, stage2_results, stage3_result, metadata
+                )
+                assistant_saved = True
+                yield f"data: {json.dumps({'type': 'complete'})}\n\n"
 
-            yield f"data: {json.dumps({'type': 'stage1_complete', 'data': stage1_results, 'all_results': all_stage1})}\n\n"
-
-            if not stage1_results:
-                yield f"data: {json.dumps({'type': 'error', 'message': 'All council members failed to respond.'})}\n\n"
-                return
-
-            yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
-            stage2_results, label_to_model, ranking_parse_failed = await stage2_collect_rankings(
-                registry, members, request.content, stage1_results, profile
-            )
-            aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
-            yield f"data: {json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings, 'ranking_parse_failed': ranking_parse_failed}})}\n\n"
-
-            yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
-            if not chairman:
-                yield f"data: {json.dumps({'type': 'error', 'message': 'No chairman configured.'})}\n\n"
-                return
-
-            stage3_result = await stage3_synthesize_final(
-                registry,
-                chairman,
-                request.content,
-                stage1_results,
-                stage2_results,
-                aggregate_rankings,
-                profile,
-            )
-            yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
-
-            metadata = {
-                "label_to_model": label_to_model,
-                "aggregate_rankings": aggregate_rankings,
-                "ranking_parse_failed": ranking_parse_failed,
-                "council_profile": profile,
-                "failed_members": [
-                    r.get("display_name")
-                    for r in all_stage1
-                    if not r.get("success")
-                ],
-            }
-
-            if title_task:
-                title = await title_task
-                storage.update_conversation_title(conversation_id, title)
-                yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
-
-            storage.add_assistant_message(
-                conversation_id, stage1_results, stage2_results, stage3_result, metadata
-            )
-            yield f"data: {json.dumps({'type': 'complete'})}\n\n"
-
-        except Exception as exc:
-            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+            except asyncio.CancelledError:
+                if title_task and not title_task.done():
+                    title_task.cancel()
+                _rollback_user_message(conversation_id, user_saved, assistant_saved)
+                raise
+            except Exception as exc:
+                _rollback_user_message(conversation_id, user_saved, assistant_saved)
+                yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
 
     return StreamingResponse(
         event_generator(),

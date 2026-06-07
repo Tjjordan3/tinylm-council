@@ -2,6 +2,15 @@
 
 A local web app where multiple **small LLMs** (0.5–4B) answer your question, peer-review each other's responses, and a chairman synthesizes a final answer. Inspired by [karpathy/llm-council](https://github.com/karpathy/llm-council), optimized for tiny models on Ollama and LM Studio.
 
+## Setup guides
+
+| Platform | Guide |
+|----------|-------|
+| **Windows** (PC + phone via Tailscale) | **[docs/WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md)** |
+| **Linux server** (production + Tailscale) | **[docs/SERVER_SETUP.md](docs/SERVER_SETUP.md)** |
+
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
+
 ## How it works
 
 1. **Stage 1 — First opinions:** Your question goes to all council members in parallel.
@@ -37,6 +46,8 @@ Switch profiles in **Settings**.
 7. Ask a short factual question first (e.g. "What is the capital of France?")
 
 ## Quick start (Windows)
+
+See the full **[Windows setup guide](docs/WINDOWS_SETUP.md)** for diagrams, Tailscale phone access, and troubleshooting.
 
 ### 1. Install dependencies
 
@@ -141,6 +152,8 @@ Vite is configured with `host: true`, so the frontend listens on `0.0.0.0:5173` 
 
 ## Self-hosted setup
 
+For Linux server deployment with nginx and systemd, see **[docs/SERVER_SETUP.md](docs/SERVER_SETUP.md)**.
+
 ### Ollama
 
 1. Ensure Ollama is running (`http://localhost:11434`)
@@ -159,8 +172,10 @@ Vite is configured with `host: true`, so the frontend listens on `0.0.0.0:5173` 
 tinylm-council/
   backend/           FastAPI server, council logic, tiny-model prompts
   frontend/          React + Vite UI (responsive + PWA manifest)
+  docs/              Windows and Linux setup guides
   data/              Settings and conversations (runtime, not committed)
   start.ps1          Windows launcher
+  CHANGELOG.md       Release notes
 ```
 
 ## Tech stack

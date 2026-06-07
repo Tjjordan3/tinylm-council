@@ -5,7 +5,12 @@ export default function Stage1({ responses, allResults, defaultCollapsed = false
   const [activeTab, setActiveTab] = useState(0);
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
-  if (!responses || responses.length === 0) return null;
+  const displayResponses =
+    responses?.length > 0
+      ? responses
+      : (allResults || []).filter((result) => result.success);
+
+  if (displayResponses.length === 0) return null;
 
   return (
     <div className="mb-4 rounded-lg border border-gray-800 bg-[#12141c]">
@@ -30,7 +35,7 @@ export default function Stage1({ responses, allResults, defaultCollapsed = false
           )}
 
           <div className="mt-3 flex flex-wrap gap-2">
-            {responses.map((resp, index) => (
+            {displayResponses.map((resp, index) => (
               <button
                 key={resp.member_id || index}
                 onClick={() => setActiveTab(index)}
@@ -46,9 +51,9 @@ export default function Stage1({ responses, allResults, defaultCollapsed = false
           </div>
 
           <div className="mt-3 rounded-md bg-[#0f1117] p-4">
-            <div className="mb-2 text-xs text-gray-500">{responses[activeTab].model}</div>
+            <div className="mb-2 text-xs text-gray-500">{displayResponses[activeTab].model}</div>
             <div className="markdown-body text-sm text-gray-200">
-              <ReactMarkdown>{responses[activeTab].response}</ReactMarkdown>
+              <ReactMarkdown>{displayResponses[activeTab].response}</ReactMarkdown>
             </div>
           </div>
         </div>

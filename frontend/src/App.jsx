@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
 import SetupWizard from './pages/SetupWizard';
@@ -15,6 +15,7 @@ export default function App() {
   const [settings, setSettings] = useState(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const abortControllerRef = useRef(null);
 
   useEffect(() => {
     loadSettings();
@@ -74,9 +75,34 @@ export default function App() {
     }
   };
 
+  const updateLastAssistantMessage = (prev, patch) => {
+    if (!prev?.messages?.length) return prev;
+    const lastIndex = prev.messages.length - 1;
+    const lastMsg = prev.messages[lastIndex];
+    if (lastMsg.role !== 'assistant') return prev;
+    const messages = prev.messages.slice();
+    messages[lastIndex] = { ...lastMsg, ...patch };
+    return { ...prev, messages };
+  };
+
+  const upsertStage1Result = (allStage1, data) => {
+    const next = [...(allStage1 || [])];
+    const idx = next.findIndex((r) => r.member_id === data.member_id);
+    if (idx >= 0) next[idx] = data;
+    else next.push(data);
+    return next;
+  };
+
+  const handleStopConsultation = () => {
+    abortControllerRef.current?.abort();
+  };
+
   const handleSendMessage = async (content) => {
     if (!currentConversationId) return;
     setIsLoading(true);
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     try {
       const userMessage = { role: 'user', content };
@@ -100,101 +126,159 @@ export default function App() {
         messages: [...prev.messages, assistantMessage],
       }));
 
-      await api.sendMessageStream(currentConversationId, content, (eventType, event) => {
+      let streamCompleted = false;
+      let streamErrored = false;
+      const streamResult = await api.sendMessageStream(
+        currentConversationId,
+        content,
+        (eventType, event) => {
         switch (eventType) {
           case 'stage1_start':
             setCurrentConversation((prev) => {
-              const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.loading.stage1 = true;
-              lastMsg.memberStatuses = {};
+              const memberStatuses = {};
               for (const m of event.members || []) {
-                lastMsg.memberStatuses[m.id] = { status: 'waiting', ...m };
+                memberStatuses[m.id] = { status: 'waiting', ...m };
               }
-              return { ...prev, messages };
+              return updateLastAssistantMessage(prev, {
+                loading: { stage1: true, stage2: false, stage3: false },
+                memberStatuses,
+              });
             });
             break;
-          case 'member_complete':
+          case 'member_complete': {
+            const data = event.data;
             setCurrentConversation((prev) => {
-              const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              const data = event.data;
-              lastMsg.memberStatuses = lastMsg.memberStatuses || {};
-              lastMsg.memberStatuses[data.member_id] = {
-                ...lastMsg.memberStatuses[data.member_id],
-                status: data.success ? 'done' : 'failed',
-                error: data.error,
-              };
-              return { ...prev, messages };
+              const lastMsg = prev.messages[prev.messages.length - 1];
+              const allStage1 = upsertStage1Result(lastMsg.allStage1, data);
+              const stage1 = allStage1.filter((r) => r.success);
+              return updateLastAssistantMessage(prev, {
+                memberStatuses: {
+                  ...(lastMsg.memberStatuses || {}),
+                  [data.member_id]: {
+                    ...(lastMsg.memberStatuses?.[data.member_id] || {}),
+                    status: data.success ? 'done' : 'failed',
+                    error: data.error,
+                  },
+                },
+                allStage1,
+                stage1: stage1.length ? stage1 : lastMsg.stage1,
+              });
             });
             break;
+          }
           case 'stage1_complete':
-            setCurrentConversation((prev) => {
-              const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.stage1 = event.data;
-              lastMsg.allStage1 = event.all_results;
-              lastMsg.loading.stage1 = false;
-              return { ...prev, messages };
-            });
+            setCurrentConversation((prev) =>
+              updateLastAssistantMessage(prev, {
+                stage1: event.data,
+                allStage1: event.all_results,
+                loading: {
+                  ...(prev.messages[prev.messages.length - 1].loading || {}),
+                  stage1: false,
+                },
+              })
+            );
             break;
           case 'stage2_start':
-            setCurrentConversation((prev) => {
-              const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.loading.stage2 = true;
-              return { ...prev, messages };
-            });
+            setCurrentConversation((prev) =>
+              updateLastAssistantMessage(prev, {
+                loading: {
+                  ...(prev.messages[prev.messages.length - 1].loading || {}),
+                  stage2: true,
+                },
+              })
+            );
             break;
           case 'stage2_complete':
-            setCurrentConversation((prev) => {
-              const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.stage2 = event.data;
-              lastMsg.metadata = event.metadata;
-              lastMsg.loading.stage2 = false;
-              return { ...prev, messages };
-            });
+            setCurrentConversation((prev) =>
+              updateLastAssistantMessage(prev, {
+                stage2: event.data,
+                metadata: event.metadata,
+                loading: {
+                  ...(prev.messages[prev.messages.length - 1].loading || {}),
+                  stage2: false,
+                },
+              })
+            );
             break;
           case 'stage3_start':
-            setCurrentConversation((prev) => {
-              const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.loading.stage3 = true;
-              return { ...prev, messages };
-            });
+            setCurrentConversation((prev) =>
+              updateLastAssistantMessage(prev, {
+                loading: {
+                  ...(prev.messages[prev.messages.length - 1].loading || {}),
+                  stage3: true,
+                },
+              })
+            );
             break;
           case 'stage3_complete':
-            setCurrentConversation((prev) => {
-              const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.stage3 = event.data;
-              lastMsg.loading.stage3 = false;
-              return { ...prev, messages };
-            });
+            setCurrentConversation((prev) =>
+              updateLastAssistantMessage(prev, {
+                stage3: event.data,
+                loading: {
+                  ...(prev.messages[prev.messages.length - 1].loading || {}),
+                  stage3: false,
+                },
+              })
+            );
             break;
           case 'title_complete':
             loadConversations();
             break;
           case 'complete':
+            streamCompleted = true;
             loadConversations();
-            setIsLoading(false);
             break;
           case 'error':
+            streamErrored = true;
             console.error('Stream error:', event.message);
-            setIsLoading(false);
             alert(event.message);
             break;
           default:
             break;
         }
-      });
+      },
+        { signal: controller.signal }
+      );
+
+      if (streamResult.aborted) {
+        setCurrentConversation((prev) => ({
+          ...prev,
+          messages: prev.messages.slice(0, -2),
+        }));
+        await loadConversation(currentConversationId);
+        return;
+      }
+
+      if (streamResult.completed || streamCompleted) {
+        await loadConversation(currentConversationId);
+      } else if (!streamResult.completed && !streamCompleted) {
+        if (!streamErrored) {
+          alert(
+            'Council response did not finish. The connection may have timed out. Please try again and wait for one request to complete before starting another.'
+          );
+        }
+        setCurrentConversation((prev) => ({
+          ...prev,
+          messages: prev.messages.slice(0, -2),
+        }));
+        await loadConversation(currentConversationId);
+      }
     } catch (error) {
+      if (error.name === 'AbortError') {
+        setCurrentConversation((prev) => ({
+          ...prev,
+          messages: prev.messages.slice(0, -2),
+        }));
+        await loadConversation(currentConversationId);
+        return;
+      }
       console.error('Failed to send message:', error);
       setCurrentConversation((prev) => ({
         ...prev,
         messages: prev.messages.slice(0, -2),
       }));
+    } finally {
+      abortControllerRef.current = null;
       setIsLoading(false);
     }
   };
@@ -258,6 +342,7 @@ export default function App() {
             <ChatInterface
               conversation={currentConversation}
               onSendMessage={handleSendMessage}
+              onStopConsultation={handleStopConsultation}
               isLoading={isLoading}
               settings={settings}
             />

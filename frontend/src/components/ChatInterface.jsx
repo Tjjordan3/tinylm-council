@@ -12,7 +12,13 @@ function providerBadge(providerId, settings) {
   return 'Local';
 }
 
-export default function ChatInterface({ conversation, onSendMessage, isLoading, settings }) {
+export default function ChatInterface({
+  conversation,
+  onSendMessage,
+  onStopConsultation,
+  isLoading,
+  settings,
+}) {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
 
@@ -88,13 +94,13 @@ export default function ChatInterface({ conversation, onSendMessage, isLoading, 
 
                   <StageProgress
                     loading={msg.loading}
-                    stage1Done={!!msg.stage1}
+                    stage1Done={Boolean(
+                      msg.stage1?.length || msg.allStage1?.length || msg.stage2 || msg.stage3
+                    )}
                     stage2Done={!!msg.stage2}
                     stage3Done={!!msg.stage3}
                     memberStatuses={msg.memberStatuses}
                   />
-
-                  {msg.stage3 && <Stage3 result={msg.stage3} />}
 
                   <Stage1
                     responses={msg.stage1}
@@ -109,6 +115,8 @@ export default function ChatInterface({ conversation, onSendMessage, isLoading, 
                     rankingParseFailed={msg.metadata?.ranking_parse_failed}
                     defaultCollapsed={!!msg.stage3}
                   />
+
+                  {msg.stage3 && <Stage3 result={msg.stage3} />}
                 </div>
               )}
             </div>
@@ -128,13 +136,24 @@ export default function ChatInterface({ conversation, onSendMessage, isLoading, 
             placeholder="Ask the council a question..."
             className="flex-1 resize-none rounded-xl border border-gray-700 bg-[#12141c] px-4 py-3 text-gray-100 placeholder-gray-500 focus:border-indigo-500 focus:outline-none disabled:opacity-50"
           />
-          <button
-            type="submit"
-            disabled={isLoading || !input.trim()}
-            className="rounded-xl bg-indigo-600 px-6 py-3 font-medium text-white hover:bg-indigo-500 disabled:opacity-50 sm:self-end"
-          >
-            {isLoading ? 'Consulting...' : 'Send'}
-          </button>
+          <div className="flex flex-col gap-3 sm:flex-row sm:self-end">
+            {isLoading && (
+              <button
+                type="button"
+                onClick={onStopConsultation}
+                className="rounded-xl border border-red-500/60 bg-red-950/40 px-6 py-3 font-medium text-red-200 hover:bg-red-900/50"
+              >
+                Stop
+              </button>
+            )}
+            <button
+              type="submit"
+              disabled={isLoading || !input.trim()}
+              className="rounded-xl bg-indigo-600 px-6 py-3 font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+            >
+              {isLoading ? 'Consulting...' : 'Send'}
+            </button>
+          </div>
         </form>
       </div>
     </main>

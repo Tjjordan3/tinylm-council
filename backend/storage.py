@@ -74,6 +74,19 @@ def add_user_message(conversation_id: str, content: str) -> None:
     save_conversation(conversation)
 
 
+def remove_last_user_message(conversation_id: str) -> bool:
+    """Remove the trailing user message if the council run did not finish."""
+    conversation = get_conversation(conversation_id)
+    if conversation is None:
+        return False
+    messages = conversation.get("messages", [])
+    if not messages or messages[-1].get("role") != "user":
+        return False
+    conversation["messages"] = messages[:-1]
+    save_conversation(conversation)
+    return True
+
+
 def add_assistant_message(
     conversation_id: str,
     stage1: List[Dict[str, Any]],
