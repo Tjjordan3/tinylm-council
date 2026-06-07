@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+data/conversations/*.json
+data/settings.json
+node_modules/
+frontend/dist/
+.DS_Store
+*.log
