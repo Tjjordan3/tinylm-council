@@ -1,17 +1,44 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 
+const NATIVE_BASE_URL_DEFAULTS = {
+  ollama: 'http://localhost:11434',
+  lmstudio: 'http://localhost:1234',
+  localai: 'http://localhost:8080',
+  vllm: 'http://localhost:8000',
+};
+
+const NATIVE_URL_PRESETS = new Set(['ollama', 'lmstudio', 'localai', 'vllm']);
+
+function deriveNativeBaseUrl(baseUrl) {
+  return baseUrl.replace(/\/v1\/?$/, '');
+}
+
 const COUNCIL_PRESETS = {
-  tinyLocal: [
-    { provider_id: 'ollama', model: 'qwen2.5:0.5b', display_name: 'Qwen 0.5B' },
-    { provider_id: 'ollama', model: 'phi3:mini', display_name: 'Phi-3 Mini' },
-    { provider_id: 'ollama', model: 'gemma2:2b', display_name: 'Gemma 2B' },
-  ],
-  cloud: [
-    { provider_id: 'openrouter', model: 'google/gemini-2.5-flash', display_name: 'Gemini Flash' },
-    { provider_id: 'openrouter', model: 'openai/gpt-4o-mini', display_name: 'GPT-4o Mini' },
-    { provider_id: 'openrouter', model: 'anthropic/claude-3.5-sonnet', display_name: 'Claude 3.5' },
-  ],
+  tinyLocal: {
+    council_profile: 'tiny',
+    members: [
+      { provider_id: 'ollama', model: 'qwen2.5:0.5b', display_name: 'Qwen 0.5B' },
+      { provider_id: 'ollama', model: 'phi3:mini', display_name: 'Phi-3 Mini' },
+      { provider_id: 'ollama', model: 'gemma2:2b', display_name: 'Gemma 2B' },
+    ],
+  },
+  miniCoding: {
+    council_profile: 'tiny',
+    members: [
+      { provider_id: 'ollama', model: 'qwen2.5-coder:1.5b', display_name: 'Qwen Coder 1.5B' },
+      { provider_id: 'ollama', model: 'deepseek-coder:1.3b', display_name: 'DeepSeek Coder 1.3B' },
+      { provider_id: 'ollama', model: 'qwen2.5-coder:0.5b', display_name: 'Qwen Coder 0.5B' },
+    ],
+  },
+  cloud: {
+    council_profile: 'standard',
+    members: [
+      { provider_id: 'openrouter', model: 'google/gemini-2.5-flash', display_name: 'Gemini Flash' },
+      { provider_id: 'openrouter', model: 'openai/gpt-4o-mini', display_name: 'GPT-4o Mini' },
+      { provider_id: 'openrouter', model: 'anthropic/claude-3.5-sonnet', display_name: 'Claude 3.5' },
+    ],
+  },
 };
 
 export default function Settings({ settings: initialSettings, onSave }) {
@@ -20,9 +47,12 @@ export default function Settings({ settings: initialSettings, onSave }) {
   const [testResults, setTestResults] = useState({});
   const [saved, setSaved] = useState(false);
   const [availableModels, setAvailableModels] = useState({});
+  const [serperApiKeyInput, setSerperApiKeyInput] = useState('');
+  const [webSearchTest, setWebSearchTest] = useState(null);
 
   useEffect(() => {
     setSettings(initialSettings);
+    setSerperApiKeyInput('');
   }, [initialSettings]);
 
   useEffect(() => {
@@ -32,7 +62,17 @@ export default function Settings({ settings: initialSettings, onSave }) {
   const updateProvider = (index, field, value) => {
     setSettings((prev) => {
       const providers = [...prev.providers];
-      providers[index] = { ...providers[index], [field]: value };
+      const provider = { ...providers[index], [field]: value };
+
+      if (field === 'base_url' && NATIVE_URL_PRESETS.has(provider.preset)) {
+        const defaultNative = NATIVE_BASE_URL_DEFAULTS[provider.preset];
+        const currentNative = providers[index].native_base_url;
+        if (!currentNative || currentNative === defaultNative) {
+          provider.native_base_url = deriveNativeBaseUrl(value);
+        }
+      }
+
+      providers[index] = provider;
       return { ...prev, providers };
     });
   };
@@ -104,21 +144,57 @@ export default function Settings({ settings: initialSettings, onSave }) {
   const applyCouncilPreset = (presetName) => {
     const preset = COUNCIL_PRESETS[presetName];
     if (!preset) return;
+    const memberIdBase = Date.now();
     setSettings((prev) => ({
       ...prev,
-      council_members: preset.map((m, i) => ({
-        id: `m${Date.now()}${i}`,
+      council_profile: preset.council_profile || prev.council_profile,
+      council_members: preset.members.map((m, i) => ({
+        id: `m${memberIdBase}${i}`,
         ...m,
         enabled: true,
       })),
-      chairman_member_id: `m${Date.now()}0`,
+      chairman_member_id: `m${memberIdBase}0`,
     }));
   };
 
+  const buildSavePayload = (extra = {}) => {
+    const payload = { ...settings, ...extra };
+    delete payload.serper_api_key_configured;
+    delete payload.serper_api_key_source;
+    if ('serper_api_key' in extra) {
+      return payload;
+    }
+    if (serperApiKeyInput.trim()) {
+      payload.serper_api_key = serperApiKeyInput.trim();
+    }
+    return payload;
+  };
+
   const handleSave = async () => {
-    await onSave(settings);
+    await onSave(buildSavePayload());
+    setSerperApiKeyInput('');
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const clearSerperKey = async () => {
+    await onSave(buildSavePayload({ serper_api_key: '' }));
+    setSerperApiKeyInput('');
+    setWebSearchTest(null);
+  };
+
+  const testWebSearch = async () => {
+    setWebSearchTest(null);
+    if (serperApiKeyInput.trim()) {
+      await onSave(buildSavePayload());
+      setSerperApiKeyInput('');
+    }
+    try {
+      const result = await api.testWebSearch();
+      setWebSearchTest(result);
+    } catch (error) {
+      setWebSearchTest({ ok: false, message: error.message || 'Web search test failed' });
+    }
   };
 
   return (
@@ -160,13 +236,94 @@ export default function Settings({ settings: initialSettings, onSave }) {
         </section>
 
         <section className="mt-6 rounded-xl border border-gray-800 bg-[#12141c] p-4 md:p-6">
+          <h2 className="text-lg font-medium text-white">Web search</h2>
+          <p className="mt-1 text-sm text-gray-400">
+            Optional pre-search before council runs. Uses{' '}
+            <a
+              href="https://serper.dev"
+              target="_blank"
+              rel="noreferrer"
+              className="text-indigo-400 hover:text-indigo-300"
+            >
+              Serper
+            </a>{' '}
+            (~2,500 free searches/month). You can also set <code className="text-gray-300">SERPER_API_KEY</code>{' '}
+            in a root <code className="text-gray-300">.env</code> file instead.
+          </p>
+          <div className="mt-4 space-y-3">
+            <label className="block text-sm text-gray-300">
+              Serper API key
+              {settings.serper_api_key_source === 'settings' && !serperApiKeyInput && (
+                <span className="ml-2 text-green-400">Configured in app</span>
+              )}
+              {settings.serper_api_key_source === 'env' && !serperApiKeyInput && (
+                <span className="ml-2 text-green-400">Configured via .env</span>
+              )}
+            </label>
+            <input
+              type="password"
+              value={serperApiKeyInput}
+              onChange={(e) => setSerperApiKeyInput(e.target.value)}
+              placeholder={
+                settings.serper_api_key_source === 'settings'
+                  ? 'Key saved — enter a new key to replace'
+                  : settings.serper_api_key_source === 'env'
+                    ? 'Key from .env — enter here to override in app'
+                    : 'Paste your Serper API key'
+              }
+              className="w-full rounded-md border border-gray-700 bg-[#0f1117] px-3 py-2 text-sm text-gray-300"
+              autoComplete="off"
+            />
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={testWebSearch}
+                className="rounded-md bg-gray-800 px-3 py-1.5 text-sm text-gray-200 hover:bg-gray-700"
+              >
+                Test web search
+              </button>
+              {settings.serper_api_key_source === 'settings' && (
+                <button
+                  onClick={clearSerperKey}
+                  className="rounded-md bg-red-900/30 px-3 py-1.5 text-sm text-red-300 hover:bg-red-900/50"
+                >
+                  Clear saved key
+                </button>
+              )}
+            </div>
+            {settings.serper_api_key_source === 'env' && (
+              <p className="text-xs text-gray-500">
+                To remove the .env key, edit or delete <code className="text-gray-400">SERPER_API_KEY</code>{' '}
+                in your root <code className="text-gray-400">.env</code> file and restart the app.
+              </p>
+            )}
+            {webSearchTest && (
+              <div className={`text-sm ${webSearchTest.ok ? 'text-green-400' : 'text-red-400'}`}>
+                {webSearchTest.message}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-xl border border-gray-800 bg-[#12141c] p-4 md:p-6">
           <h2 className="text-lg font-medium text-white">Council presets</h2>
+          <p className="mt-1 text-sm text-gray-400">
+            Mini coding council uses tiny code models — run{' '}
+            <code className="text-gray-300">ollama pull qwen2.5-coder:1.5b</code> (and the other
+            preset models) if they are not installed yet.
+          </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               onClick={() => applyCouncilPreset('tinyLocal')}
               className="rounded-lg bg-gray-800 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700"
             >
               Tiny local council (Ollama)
+            </button>
+            <button
+              onClick={() => applyCouncilPreset('miniCoding')}
+              title="Requires qwen2.5-coder and deepseek-coder models in Ollama"
+              className="rounded-lg bg-gray-800 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700"
+            >
+              Mini coding council (Ollama)
             </button>
             <button
               onClick={() => applyCouncilPreset('cloud')}
@@ -189,11 +346,26 @@ export default function Settings({ settings: initialSettings, onSave }) {
                       onChange={(e) => updateProvider(index, 'name', e.target.value)}
                       className="w-full rounded-md border border-gray-700 bg-[#0f1117] px-3 py-2 text-white"
                     />
-                    <input
-                      value={provider.base_url}
-                      onChange={(e) => updateProvider(index, 'base_url', e.target.value)}
-                      className="w-full rounded-md border border-gray-700 bg-[#0f1117] px-3 py-2 text-sm text-gray-300"
-                    />
+                    <div>
+                      <label className="mb-1 block text-xs text-gray-500">base_url (OpenAI-compatible API)</label>
+                      <input
+                        value={provider.base_url}
+                        onChange={(e) => updateProvider(index, 'base_url', e.target.value)}
+                        className="w-full rounded-md border border-gray-700 bg-[#0f1117] px-3 py-2 text-sm text-gray-300"
+                      />
+                    </div>
+                    {NATIVE_URL_PRESETS.has(provider.preset) && (
+                      <div>
+                        <label className="mb-1 block text-xs text-gray-500">
+                          native_base_url (model listing / pull)
+                        </label>
+                        <input
+                          value={provider.native_base_url || ''}
+                          onChange={(e) => updateProvider(index, 'native_base_url', e.target.value)}
+                          className="w-full rounded-md border border-gray-700 bg-[#0f1117] px-3 py-2 text-sm text-gray-300"
+                        />
+                      </div>
+                    )}
                   </div>
                   <div className="flex shrink-0 gap-2">
                     <button

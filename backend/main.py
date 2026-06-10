@@ -36,6 +36,7 @@ from .web_search import (
     WebSearchResult,
     is_web_search_configured,
     search_web,
+    serper_key_setup_message,
     web_search_metadata,
 )
 from .providers.registry import ProviderRegistry
@@ -105,6 +106,7 @@ class SettingsUpdateRequest(BaseModel):
     chairman_member_id: Optional[str] = None
     council_profile: Optional[str] = None
     setup_complete: Optional[bool] = None
+    serper_api_key: Optional[str] = None
 
 
 class PullModelRequest(BaseModel):
@@ -253,7 +255,7 @@ async def test_web_search():
     if not is_web_search_configured():
         return {
             "ok": False,
-            "message": "Set SERPER_API_KEY in .env (free key at https://serper.dev)",
+            "message": serper_key_setup_message(),
         }
     result = await search_web("current date and time UTC", "tiny")
     if result.error:
@@ -327,7 +329,7 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                 if request.use_web_search:
                     yield f"data: {json.dumps({'type': 'web_search_start'})}\n\n"
                     if not is_web_search_configured():
-                        skip_message = "Set SERPER_API_KEY in .env (free key at https://serper.dev)"
+                        skip_message = serper_key_setup_message()
                         skipped = WebSearchResult(query=request.content, error=skip_message)
                         web_search_info = web_search_metadata(skipped, enabled=True)
                         yield f"data: {json.dumps({'type': 'web_search_skipped', 'message': skip_message, 'data': web_search_info})}\n\n"

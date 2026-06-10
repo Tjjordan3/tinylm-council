@@ -28,7 +28,24 @@ def _get_provider_name() -> str:
 
 
 def _get_serper_api_key() -> Optional[str]:
-    return os.getenv("SERPER_API_KEY") or None
+    from .settings import load_settings
+
+    settings = load_settings()
+    if settings.serper_api_key and settings.serper_api_key.strip():
+        return settings.serper_api_key.strip()
+    env_key = os.getenv("SERPER_API_KEY")
+    return env_key.strip() if env_key and env_key.strip() else None
+
+
+def serper_key_setup_message() -> str:
+    return (
+        "Add your Serper API key in Settings or set SERPER_API_KEY in .env "
+        "(free key at https://serper.dev)"
+    )
+
+
+def _missing_serper_key_message() -> str:
+    return serper_key_setup_message()
 
 
 def _format_context(sources: List[Dict[str, str]], profile: str) -> str:
@@ -50,7 +67,7 @@ async def _serper_search(query: str, profile: str) -> WebSearchResult:
     if not api_key:
         return WebSearchResult(
             query=query,
-            error="Set SERPER_API_KEY in .env (get a free key at https://serper.dev)",
+            error=_missing_serper_key_message(),
         )
 
     try:

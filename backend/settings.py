@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -79,8 +80,21 @@ def _default_settings() -> AppSettings:
     )
 
 
-def settings_to_dict(settings: AppSettings) -> Dict[str, Any]:
-    return {
+def _serper_api_key_source(settings: AppSettings) -> Optional[str]:
+    if settings.serper_api_key and settings.serper_api_key.strip():
+        return "settings"
+    env_key = os.getenv("SERPER_API_KEY")
+    if env_key and env_key.strip():
+        return "env"
+    return None
+
+
+def _serper_api_key_configured(settings: AppSettings) -> bool:
+    return _serper_api_key_source(settings) is not None
+
+
+def settings_to_dict(settings: AppSettings, *, include_secrets: bool = False) -> Dict[str, Any]:
+    result: Dict[str, Any] = {
         "providers": [
             {
                 "id": p.id,
@@ -107,6 +121,12 @@ def settings_to_dict(settings: AppSettings) -> Dict[str, Any]:
         "council_profile": settings.council_profile,
         "setup_complete": settings.setup_complete,
     }
+    if include_secrets:
+        result["serper_api_key"] = settings.serper_api_key
+    else:
+        result["serper_api_key_configured"] = _serper_api_key_configured(settings)
+        result["serper_api_key_source"] = _serper_api_key_source(settings)
+    return result
 
 
 def settings_from_dict(data: Dict[str, Any]) -> AppSettings:
@@ -116,6 +136,7 @@ def settings_from_dict(data: Dict[str, Any]) -> AppSettings:
         chairman_member_id=data.get("chairman_member_id"),
         council_profile=data.get("council_profile", "tiny"),
         setup_complete=data.get("setup_complete", False),
+        serper_api_key=data.get("serper_api_key"),
     )
 
 
@@ -137,7 +158,7 @@ def load_settings() -> AppSettings:
 def save_settings(settings: AppSettings) -> None:
     ensure_data_dir()
     with open(SETTINGS_PATH, "w", encoding="utf-8") as f:
-        json.dump(settings_to_dict(settings), f, indent=2)
+        json.dump(settings_to_dict(settings, include_secrets=True), f, indent=2)
 
 
 def update_settings(data: Dict[str, Any]) -> AppSettings:
@@ -152,6 +173,9 @@ def update_settings(data: Dict[str, Any]) -> AppSettings:
         current.council_profile = data["council_profile"]
     if "setup_complete" in data:
         current.setup_complete = data["setup_complete"]
+    if "serper_api_key" in data:
+        key = data["serper_api_key"]
+        current.serper_api_key = key.strip() if key and key.strip() else None
     save_settings(current)
     return current
 

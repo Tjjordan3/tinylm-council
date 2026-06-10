@@ -85,7 +85,7 @@ copy .env.example .env
 
 Edit `.env` and set `OPENROUTER_API_KEY` if you use OpenRouter.
 
-For **web search** (optional), add a free [Serper](https://serper.dev) API key:
+For **web search** (optional), add a free [Serper](https://serper.dev) API key in **Settings → Web search**, or in `.env`:
 
 ```env
 SERPER_API_KEY=your-key-here
@@ -108,21 +108,21 @@ Open **http://localhost:5173** in your browser.
 1. Complete the **setup wizard** (Ollama-only is fine).
 2. Go to **Settings**:
    - **Council profile:** Tiny (best for 0.5–4B models)
-   - Apply **Tiny local council** preset, or enable 2+ models you have installed
+   - Apply **Tiny local council** preset, **Mini coding council** for code tasks, or enable 2+ models you have installed
    - Pick a **chairman** — use an **instruct/chat** model, not a base model
    - Click **Save changes**
 3. Ask a short test question (e.g. "What is the capital of France?").
 
 ### Ollama on a remote server
 
-If Ollama runs on another machine (e.g. over Tailscale), set **both** URLs in Settings → Providers → Ollama:
+If Ollama runs on another machine (e.g. over Tailscale), set **both** URLs in Settings → Providers → Ollama (both fields are editable in the UI):
 
 | Field | Example |
 |-------|---------|
 | base_url | `http://100.x.x.x:11434/v1` |
 | native_base_url | `http://100.x.x.x:11434` |
 
-Both must use the **same host**. Mismatched `native_base_url` causes models to not appear in the UI.
+Both must use the **same host**. Mismatched `native_base_url` causes models to not appear in the UI. Editing `base_url` auto-updates `native_base_url` when it is still the localhost default.
 
 ## Phone access (Tailscale)
 
@@ -140,7 +140,7 @@ Inference still runs on the PC (or wherever your Ollama server is configured). T
 - **Stop button** — appears while a consultation runs; cancels the current council and clears partial results.
 - **One at a time** — wait for a run to finish (or stop it) before sending another question.
 - **Failed models** — one bad model does not stop the council; remove unreliable models in Settings.
-- **Web search** — check **Search the web first** before sending; requires `SERPER_API_KEY` in `.env` ([serper.dev](https://serper.dev), ~2,500 free searches/month). Sources show in the **Web sources** panel. Council still runs if the key is missing (with a warning).
+- **Web search** — check **Search the web first** before sending; add your Serper key in **Settings → Web search** or in `.env` ([serper.dev](https://serper.dev), ~2,500 free searches/month). Sources show in the **Web sources** panel. Council still runs if the key is missing (with a warning).
 
 ## Manual start (without start.ps1)
 
@@ -176,7 +176,7 @@ npm run dev
 | Mobile can't connect | Check Tailscale on both devices; allow firewall on port 5173 |
 | `npm` not found | Install Node.js LTS from [nodejs.org](https://nodejs.org), reopen PowerShell |
 | `start.ps1` opens Notepad | Run `.\start.ps1` in PowerShell, not `start start.ps1` |
-| Web search skipped | Add `SERPER_API_KEY` to `.env` and restart the app |
+| Web search skipped | Add your Serper key in **Settings → Web search** or in `.env`, then save/restart |
 
 ## Data location
 

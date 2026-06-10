@@ -24,7 +24,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 | **Tiny** (default) | 0.5–4B local models | Short prompts, token limits, trimmed context, simpler `RANK:` format |
 | **Standard** | Cloud / large models | Original longer prompts and full context |
 
-Switch profiles in **Settings**. Optional **Search the web first** (per message) uses [Serper](https://serper.dev) — set `SERPER_API_KEY` in `.env`.
+Switch profiles in **Settings**. Optional **Search the web first** (per message) uses [Serper](https://serper.dev) — add the key in **Settings → Web search** or in `.env`.
 
 ## Supported providers
 
@@ -41,9 +41,17 @@ Switch profiles in **Settings**. Optional **Search the web first** (per message)
 2. From the project folder, run `.\start.ps1`
 3. Open http://localhost:5173 and complete the setup wizard (Ollama only is fine)
 4. In **Settings**, confirm **Tiny** profile is selected
-5. Apply the **Tiny local council** preset, or enable 2+ models you have installed
+5. Apply the **Tiny local council** preset, **Mini coding council** (code-tuned models), or enable 2+ models you have installed
 6. Pick a chairman and save
 7. Ask a short factual question first (e.g. "What is the capital of France?")
+
+For the **Mini coding council** preset, pull the models first:
+
+```powershell
+ollama pull qwen2.5-coder:1.5b
+ollama pull deepseek-coder:1.3b
+ollama pull qwen2.5-coder:0.5b
+```
 
 ## Quick start (Windows)
 
