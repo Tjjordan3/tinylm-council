@@ -38,6 +38,9 @@ def _is_local_provider(config: Optional[ProviderConfig]) -> bool:
 
 
 def _should_serialize_local(profile: str, config: Optional[ProviderConfig]) -> bool:
+    settings = load_settings()
+    if settings.parallel_local_inference:
+        return False
     if profile == "tiny":
         return _is_local_provider(config)
     return False

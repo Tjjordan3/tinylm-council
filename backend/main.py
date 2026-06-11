@@ -107,6 +107,7 @@ class SettingsUpdateRequest(BaseModel):
     council_profile: Optional[str] = None
     setup_complete: Optional[bool] = None
     serper_api_key: Optional[str] = None
+    parallel_local_inference: Optional[bool] = None
 
 
 class PullModelRequest(BaseModel):
@@ -286,6 +287,13 @@ async def get_conversation(conversation_id: str):
     return conversation
 
 
+@app.delete("/api/conversations/{conversation_id}")
+async def delete_conversation(conversation_id: str):
+    if not storage.delete_conversation(conversation_id):
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return {"ok": True}
+
+
 @app.post("/api/conversations/{conversation_id}/message/stream")
 async def send_message_stream(conversation_id: str, request: SendMessageRequest):
     conversation = storage.get_conversation(conversation_id)
@@ -334,7 +342,16 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                         web_search_info = web_search_metadata(skipped, enabled=True)
                         yield f"data: {json.dumps({'type': 'web_search_skipped', 'message': skip_message, 'data': web_search_info})}\n\n"
                     else:
-                        search_result = await search_web(request.content, profile)
+                        if title_task:
+                            search_result, title = await asyncio.gather(
+                                search_web(request.content, profile),
+                                title_task,
+                            )
+                            title_task = None
+                            storage.update_conversation_title(conversation_id, title)
+                            yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
+                        else:
+                            search_result = await search_web(request.content, profile)
                         web_search_info = web_search_metadata(search_result, enabled=True)
                         if search_result.error or not search_result.context_text:
                             yield f"data: {json.dumps({'type': 'web_search_skipped', 'message': search_result.error or 'No results', 'data': web_search_info})}\n\n"

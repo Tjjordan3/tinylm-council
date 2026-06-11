@@ -141,6 +141,7 @@ Inference still runs on the PC (or wherever your Ollama server is configured). T
 - **One at a time** — wait for a run to finish (or stop it) before sending another question.
 - **Failed models** — one bad model does not stop the council; remove unreliable models in Settings.
 - **Web search** — check **Search the web first** before sending; add your Serper key in **Settings → Web search** or in `.env` ([serper.dev](https://serper.dev), ~2,500 free searches/month). Sources show in the **Web sources** panel. Council still runs if the key is missing (with a warning).
+- **Delete chats** — hover a conversation in the sidebar and click **×** (always visible on mobile).
 
 ## Manual start (without start.ps1)
 
@@ -170,7 +171,9 @@ npm run dev
 |---------|-----|
 | Port 5173 or 8001 in use | Stop the old process or restart the PC; `start.ps1` warns if ports are busy |
 | Models not listed | Set `native_base_url` to match `base_url` host |
-| Council never finishes | Use **Stop**, then retry; remote Ollama with 4 models can take 10+ minutes |
+| Council never finishes | Use **Stop**, then retry; enable **Parallel Ollama requests** in Settings for remote Ollama; use 2–3 members |
+| Council very slow (remote Ollama) | Enable **Parallel Ollama requests** in Settings; set `OLLAMA_KEEP_ALIVE` on the Ollama host to reduce model reload time |
+| Web search feels slow | Normal Serper latency is 1–5s; Tiny profile now uses fewer results; council time dominates after search |
 | Stage 1 missing in UI | Refresh the page or reopen the conversation |
 | `start.ps1` parse error | Update to latest `main` — Unicode dash issue was fixed |
 | Mobile can't connect | Check Tailscale on both devices; allow firewall on port 5173 |

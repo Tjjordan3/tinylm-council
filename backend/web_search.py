@@ -11,8 +11,22 @@ import httpx
 from .context_utils import truncate_text
 
 MAX_RESULTS = 5
+MAX_RESULTS_TINY = 3
 SEARCH_TIMEOUT = 15.0
-CONTEXT_LIMITS = {"tiny": 1500, "standard": 4000}
+CONTEXT_LIMITS = {"tiny": 1000, "standard": 4000}
+
+_http_client: Optional[httpx.AsyncClient] = None
+
+
+def _get_http_client() -> httpx.AsyncClient:
+    global _http_client
+    if _http_client is None:
+        _http_client = httpx.AsyncClient(timeout=SEARCH_TIMEOUT)
+    return _http_client
+
+
+def _max_results_for_profile(profile: str) -> int:
+    return MAX_RESULTS_TINY if profile == "tiny" else MAX_RESULTS
 
 
 @dataclass
@@ -70,23 +84,24 @@ async def _serper_search(query: str, profile: str) -> WebSearchResult:
             error=_missing_serper_key_message(),
         )
 
+    num_results = _max_results_for_profile(profile)
     try:
-        async with httpx.AsyncClient(timeout=SEARCH_TIMEOUT) as client:
-            response = await client.post(
-                "https://google.serper.dev/search",
-                headers={
-                    "X-API-KEY": api_key,
-                    "Content-Type": "application/json",
-                },
-                json={"q": query, "num": MAX_RESULTS},
-            )
-            response.raise_for_status()
-            data = response.json()
+        client = _get_http_client()
+        response = await client.post(
+            "https://google.serper.dev/search",
+            headers={
+                "X-API-KEY": api_key,
+                "Content-Type": "application/json",
+            },
+            json={"q": query, "num": num_results},
+        )
+        response.raise_for_status()
+        data = response.json()
     except Exception as exc:
         return WebSearchResult(query=query, error=f"Web search failed: {exc}")
 
     sources: List[Dict[str, str]] = []
-    for item in data.get("organic", [])[:MAX_RESULTS]:
+    for item in data.get("organic", [])[:num_results]:
         sources.append(
             {
                 "title": item.get("title") or "",

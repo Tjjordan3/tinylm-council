@@ -115,3 +115,11 @@ def update_conversation_title(conversation_id: str, title: str) -> None:
         raise ValueError(f"Conversation {conversation_id} not found")
     conversation["title"] = title
     save_conversation(conversation)
+
+
+def delete_conversation(conversation_id: str) -> bool:
+    path = get_conversation_path(conversation_id)
+    if not path.exists():
+        return False
+    path.unlink()
+    return True

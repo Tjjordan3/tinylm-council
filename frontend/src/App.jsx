@@ -75,6 +75,26 @@ export default function App() {
     }
   };
 
+  const handleDeleteConversation = async (id) => {
+    if (!window.confirm('Delete this conversation?')) return;
+    try {
+      await api.deleteConversation(id);
+      const remaining = conversations.filter((c) => c.id !== id);
+      setConversations(remaining);
+      if (currentConversationId === id) {
+        if (remaining.length > 0) {
+          setCurrentConversationId(remaining[0].id);
+        } else {
+          setCurrentConversationId(null);
+          setCurrentConversation(null);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to delete conversation:', error);
+      alert('Failed to delete conversation.');
+    }
+  };
+
   const updateLastAssistantMessage = (prev, patch) => {
     if (!prev?.messages?.length) return prev;
     const lastIndex = prev.messages.length - 1;
@@ -374,6 +394,7 @@ export default function App() {
         currentConversationId={currentConversationId}
         onSelectConversation={setCurrentConversationId}
         onNewConversation={handleNewConversation}
+        onDeleteConversation={handleDeleteConversation}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />

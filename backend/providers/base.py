@@ -96,6 +96,7 @@ class AppSettings:
     council_profile: str = "tiny"
     setup_complete: bool = False
     serper_api_key: Optional[str] = None
+    parallel_local_inference: bool = False
 
     def get_enabled_members(self) -> List[CouncilMember]:
         return [m for m in self.council_members if m.enabled]

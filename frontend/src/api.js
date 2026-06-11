@@ -49,6 +49,8 @@ export const api = {
   listConversations: () => request('/api/conversations'),
   createConversation: () => request('/api/conversations', { method: 'POST' }),
   getConversation: (id) => request(`/api/conversations/${id}`),
+  deleteConversation: (id) =>
+    request(`/api/conversations/${id}`, { method: 'DELETE' }),
 
   async pullModelStream(providerId, model, onEvent) {
     const response = await fetch(`${API_BASE}/api/providers/${providerId}/models/pull`, {

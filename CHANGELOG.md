@@ -4,6 +4,18 @@ All notable changes to TinyLM Council are documented here.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-06-10
+
+### Added
+
+- **Delete conversations** — remove old chats from the sidebar (× button with confirmation)
+- **Parallel Ollama requests** — Settings toggle to run council members concurrently (auto-enabled for remote Ollama URLs)
+
+### Changed
+
+- Web search uses fewer results and shorter context on **Tiny** profile (faster Serper + less for models to read)
+- Title generation runs in parallel with web search on the first message (finishes before Stage 1, less Ollama contention during council)
+
 ## [0.4.0] - 2026-06-10
 
 ### Added
@@ -64,6 +76,7 @@ All notable changes to TinyLM Council are documented here.
 - Windows launcher (`start.ps1`)
 - LM Studio council reliability improvements
 
+[0.4.1]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.4.1
 [0.4.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.2.0

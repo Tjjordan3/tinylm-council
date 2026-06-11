@@ -7,6 +7,7 @@ import os
 import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 from .providers.base import AppSettings, CouncilMember, ProviderConfig
 from .providers.registry import (
@@ -80,6 +81,21 @@ def _default_settings() -> AppSettings:
     )
 
 
+def _is_local_ollama_host(native_base_url: Optional[str]) -> bool:
+    if not native_base_url:
+        return True
+    host = (urlparse(native_base_url).hostname or "").lower()
+    return host in ("localhost", "127.0.0.1", "::1")
+
+
+def _default_parallel_local_inference(providers: List[ProviderConfig]) -> bool:
+    for provider in providers:
+        if (provider.preset or "").lower() == "ollama":
+            if not _is_local_ollama_host(provider.native_base_url):
+                return True
+    return False
+
+
 def _serper_api_key_source(settings: AppSettings) -> Optional[str]:
     if settings.serper_api_key and settings.serper_api_key.strip():
         return "settings"
@@ -120,6 +136,7 @@ def settings_to_dict(settings: AppSettings, *, include_secrets: bool = False) ->
         "chairman_member_id": settings.chairman_member_id,
         "council_profile": settings.council_profile,
         "setup_complete": settings.setup_complete,
+        "parallel_local_inference": settings.parallel_local_inference,
     }
     if include_secrets:
         result["serper_api_key"] = settings.serper_api_key
@@ -130,13 +147,19 @@ def settings_to_dict(settings: AppSettings, *, include_secrets: bool = False) ->
 
 
 def settings_from_dict(data: Dict[str, Any]) -> AppSettings:
+    providers = [config_from_dict(p) for p in data.get("providers", [])]
+    if "parallel_local_inference" in data:
+        parallel_local_inference = bool(data["parallel_local_inference"])
+    else:
+        parallel_local_inference = _default_parallel_local_inference(providers)
     return AppSettings(
-        providers=[config_from_dict(p) for p in data.get("providers", [])],
+        providers=providers,
         council_members=[member_from_dict(m) for m in data.get("council_members", [])],
         chairman_member_id=data.get("chairman_member_id"),
         council_profile=data.get("council_profile", "tiny"),
         setup_complete=data.get("setup_complete", False),
         serper_api_key=data.get("serper_api_key"),
+        parallel_local_inference=parallel_local_inference,
     )
 
 
@@ -176,6 +199,8 @@ def update_settings(data: Dict[str, Any]) -> AppSettings:
     if "serper_api_key" in data:
         key = data["serper_api_key"]
         current.serper_api_key = key.strip() if key and key.strip() else None
+    if "parallel_local_inference" in data:
+        current.parallel_local_inference = bool(data["parallel_local_inference"])
     save_settings(current)
     return current
 

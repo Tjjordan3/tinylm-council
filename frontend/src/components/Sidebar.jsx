@@ -5,6 +5,7 @@ export default function Sidebar({
   currentConversationId,
   onSelectConversation,
   onNewConversation,
+  onDeleteConversation,
   isOpen,
   onClose,
 }) {
@@ -83,18 +84,37 @@ export default function Sidebar({
           <p className="px-2 text-sm text-gray-500">No conversations yet</p>
         ) : (
           conversations.map((conv) => (
-            <button
+            <div
               key={conv.id}
-              onClick={() => handleSelectConversation(conv.id)}
-              className={`mb-1 w-full rounded-lg px-3 py-2 text-left text-sm transition ${
+              className={`group mb-1 flex items-center gap-1 rounded-lg transition ${
                 currentConversationId === conv.id
-                  ? 'bg-gray-800 text-white'
-                  : 'text-gray-300 hover:bg-gray-800/60'
+                  ? 'bg-gray-800'
+                  : 'hover:bg-gray-800/60'
               }`}
             >
-              <div className="truncate font-medium">{conv.title}</div>
-              <div className="text-xs text-gray-500">{conv.message_count} messages</div>
-            </button>
+              <button
+                type="button"
+                onClick={() => handleSelectConversation(conv.id)}
+                className={`min-w-0 flex-1 rounded-lg px-3 py-2 text-left text-sm ${
+                  currentConversationId === conv.id ? 'text-white' : 'text-gray-300'
+                }`}
+              >
+                <div className="truncate font-medium">{conv.title}</div>
+                <div className="text-xs text-gray-500">{conv.message_count} messages</div>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteConversation(conv.id);
+                }}
+                className="mr-2 shrink-0 rounded p-1.5 text-gray-500 opacity-100 hover:bg-red-900/40 hover:text-red-300 md:opacity-0 md:group-hover:opacity-100"
+                aria-label={`Delete ${conv.title}`}
+                title="Delete conversation"
+              >
+                ×
+              </button>
+            </div>
           ))
         )}
       </div>

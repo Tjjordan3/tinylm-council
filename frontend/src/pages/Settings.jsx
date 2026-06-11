@@ -233,6 +233,26 @@ export default function Settings({ settings: initialSettings, onSave }) {
               </button>
             ))}
           </div>
+          <label className="mt-4 flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={!!settings.parallel_local_inference}
+              onChange={(e) =>
+                setSettings((prev) => ({
+                  ...prev,
+                  parallel_local_inference: e.target.checked,
+                }))
+              }
+              className="mt-1"
+            />
+            <span className="text-sm text-gray-300">
+              <span className="font-medium text-white">Parallel Ollama requests</span>
+              <span className="mt-1 block text-gray-400">
+                Faster on remote Ollama or powerful GPUs. Turn off if models crash or run out of
+                VRAM on one machine.
+              </span>
+            </span>
+          </label>
         </section>
 
         <section className="mt-6 rounded-xl border border-gray-800 bg-[#12141c] p-4 md:p-6">
