@@ -4,6 +4,20 @@ All notable changes to TinyLM Council are documented here.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-10
+
+### Added
+
+- **Serper API key in Settings** — paste your web search key in the app under **Settings → Web search** (no `.env` required); test and clear from the UI
+- **`serper_api_key_source`** — API indicates whether the key comes from app settings or `.env`
+- **`native_base_url` in Settings** — edit both Ollama/LM Studio URLs in the UI (fixes remote Ollama over Tailscale); auto-syncs from `base_url` when appropriate
+- **Mini coding council preset** — one-click council with `qwen2.5-coder:1.5b`, `deepseek-coder:1.3b`, and `qwen2.5-coder:0.5b` on Tiny profile
+
+### Changed
+
+- Cloud council preset now switches to **Standard** profile when applied
+- Docs updated for in-app Serper key and coding preset `ollama pull` commands
+
 ## [0.3.0] - 2026-06-07
 
 ### Added
@@ -50,6 +64,7 @@ All notable changes to TinyLM Council are documented here.
 - Windows launcher (`start.ps1`)
 - LM Studio council reliability improvements
 
+[0.4.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.1.0
