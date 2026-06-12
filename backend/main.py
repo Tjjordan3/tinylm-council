@@ -107,6 +107,7 @@ class SettingsUpdateRequest(BaseModel):
     council_profile: Optional[str] = None
     setup_complete: Optional[bool] = None
     serper_api_key: Optional[str] = None
+    nvidia_api_key: Optional[str] = None
     parallel_local_inference: Optional[bool] = None
 
 
@@ -249,6 +250,34 @@ async def create_council_member(request: AddMemberRequest):
         "display_name": member.display_name,
         "enabled": member.enabled,
     }
+
+
+@app.post("/api/nvidia/test")
+async def test_nvidia():
+    from .settings import get_nvidia_api_key, nvidia_key_setup_message
+
+    api_key = get_nvidia_api_key()
+    if not api_key:
+        return {"ok": False, "message": nvidia_key_setup_message()}
+
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(
+                "https://integrate.api.nvidia.com/v1/models",
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+            response.raise_for_status()
+            data = response.json()
+            count = len(data.get("data", []))
+            return {
+                "ok": True,
+                "message": f"NVIDIA NIM OK ({count} models available)",
+                "model_count": count,
+            }
+    except Exception as exc:
+        return {"ok": False, "message": f"NVIDIA NIM test failed: {exc}"}
 
 
 @app.post("/api/web-search/test")

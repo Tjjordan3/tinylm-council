@@ -96,6 +96,34 @@ def _default_parallel_local_inference(providers: List[ProviderConfig]) -> bool:
     return False
 
 
+def _nvidia_api_key_source(settings: AppSettings) -> Optional[str]:
+    if settings.nvidia_api_key and settings.nvidia_api_key.strip():
+        return "settings"
+    env_key = os.getenv("NVIDIA_API_KEY")
+    if env_key and env_key.strip():
+        return "env"
+    return None
+
+
+def _nvidia_api_key_configured(settings: AppSettings) -> bool:
+    return _nvidia_api_key_source(settings) is not None
+
+
+def get_nvidia_api_key(settings: Optional[AppSettings] = None) -> Optional[str]:
+    current = settings or load_settings()
+    if current.nvidia_api_key and current.nvidia_api_key.strip():
+        return current.nvidia_api_key.strip()
+    env_key = os.getenv("NVIDIA_API_KEY")
+    return env_key.strip() if env_key and env_key.strip() else None
+
+
+def nvidia_key_setup_message() -> str:
+    return (
+        "Add your NVIDIA API key in Settings → NVIDIA NIM "
+        "or set NVIDIA_API_KEY in .env (free key at https://build.nvidia.com)"
+    )
+
+
 def _serper_api_key_source(settings: AppSettings) -> Optional[str]:
     if settings.serper_api_key and settings.serper_api_key.strip():
         return "settings"
@@ -140,9 +168,12 @@ def settings_to_dict(settings: AppSettings, *, include_secrets: bool = False) ->
     }
     if include_secrets:
         result["serper_api_key"] = settings.serper_api_key
+        result["nvidia_api_key"] = settings.nvidia_api_key
     else:
         result["serper_api_key_configured"] = _serper_api_key_configured(settings)
         result["serper_api_key_source"] = _serper_api_key_source(settings)
+        result["nvidia_api_key_configured"] = _nvidia_api_key_configured(settings)
+        result["nvidia_api_key_source"] = _nvidia_api_key_source(settings)
     return result
 
 
@@ -159,6 +190,7 @@ def settings_from_dict(data: Dict[str, Any]) -> AppSettings:
         council_profile=data.get("council_profile", "tiny"),
         setup_complete=data.get("setup_complete", False),
         serper_api_key=data.get("serper_api_key"),
+        nvidia_api_key=data.get("nvidia_api_key"),
         parallel_local_inference=parallel_local_inference,
     )
 
@@ -199,6 +231,9 @@ def update_settings(data: Dict[str, Any]) -> AppSettings:
     if "serper_api_key" in data:
         key = data["serper_api_key"]
         current.serper_api_key = key.strip() if key and key.strip() else None
+    if "nvidia_api_key" in data:
+        key = data["nvidia_api_key"]
+        current.nvidia_api_key = key.strip() if key and key.strip() else None
     if "parallel_local_inference" in data:
         current.parallel_local_inference = bool(data["parallel_local_inference"])
     save_settings(current)

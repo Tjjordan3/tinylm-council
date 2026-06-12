@@ -20,6 +20,7 @@ export const api = {
   testProvider: (provider) =>
     request('/api/providers/test', { method: 'POST', body: JSON.stringify({ provider }) }),
   testWebSearch: () => request('/api/web-search/test', { method: 'POST' }),
+  testNvidia: () => request('/api/nvidia/test', { method: 'POST' }),
   getCapabilities: (providerId) => request(`/api/providers/${providerId}/capabilities`),
   listModels: (providerId) => request(`/api/providers/${providerId}/models`),
   listRunningModels: (providerId) => request(`/api/providers/${providerId}/models/running`),

@@ -39,6 +39,18 @@ const COUNCIL_PRESETS = {
       { provider_id: 'openrouter', model: 'anthropic/claude-3.5-sonnet', display_name: 'Claude 3.5' },
     ],
   },
+  nvidiaCloud: {
+    council_profile: 'standard',
+    members: [
+      { provider_id: 'nvidia', model: 'meta/llama-3.1-70b-instruct', display_name: 'Llama 3.1 70B' },
+      {
+        provider_id: 'nvidia',
+        model: 'nvidia/llama-3.1-nemotron-70b-instruct',
+        display_name: 'Nemotron 70B',
+      },
+      { provider_id: 'nvidia', model: 'deepseek-ai/deepseek-r1', display_name: 'DeepSeek R1' },
+    ],
+  },
 };
 
 export default function Settings({ settings: initialSettings, onSave }) {
@@ -48,11 +60,14 @@ export default function Settings({ settings: initialSettings, onSave }) {
   const [saved, setSaved] = useState(false);
   const [availableModels, setAvailableModels] = useState({});
   const [serperApiKeyInput, setSerperApiKeyInput] = useState('');
+  const [nvidiaApiKeyInput, setNvidiaApiKeyInput] = useState('');
   const [webSearchTest, setWebSearchTest] = useState(null);
+  const [nvidiaTest, setNvidiaTest] = useState(null);
 
   useEffect(() => {
     setSettings(initialSettings);
     setSerperApiKeyInput('');
+    setNvidiaApiKeyInput('');
   }, [initialSettings]);
 
   useEffect(() => {
@@ -144,6 +159,13 @@ export default function Settings({ settings: initialSettings, onSave }) {
   const applyCouncilPreset = (presetName) => {
     const preset = COUNCIL_PRESETS[presetName];
     if (!preset) return;
+    if (
+      presetName === 'nvidiaCloud' &&
+      !settings.providers.some((p) => p.id === 'nvidia')
+    ) {
+      alert('Add the NVIDIA NIM provider under Providers (+ NVIDIA NIM) and save before applying this preset.');
+      return;
+    }
     const memberIdBase = Date.now();
     setSettings((prev) => ({
       ...prev,
@@ -161,11 +183,16 @@ export default function Settings({ settings: initialSettings, onSave }) {
     const payload = { ...settings, ...extra };
     delete payload.serper_api_key_configured;
     delete payload.serper_api_key_source;
-    if ('serper_api_key' in extra) {
+    delete payload.nvidia_api_key_configured;
+    delete payload.nvidia_api_key_source;
+    if ('serper_api_key' in extra || 'nvidia_api_key' in extra) {
       return payload;
     }
     if (serperApiKeyInput.trim()) {
       payload.serper_api_key = serperApiKeyInput.trim();
+    }
+    if (nvidiaApiKeyInput.trim()) {
+      payload.nvidia_api_key = nvidiaApiKeyInput.trim();
     }
     return payload;
   };
@@ -173,6 +200,7 @@ export default function Settings({ settings: initialSettings, onSave }) {
   const handleSave = async () => {
     await onSave(buildSavePayload());
     setSerperApiKeyInput('');
+    setNvidiaApiKeyInput('');
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -194,6 +222,26 @@ export default function Settings({ settings: initialSettings, onSave }) {
       setWebSearchTest(result);
     } catch (error) {
       setWebSearchTest({ ok: false, message: error.message || 'Web search test failed' });
+    }
+  };
+
+  const clearNvidiaKey = async () => {
+    await onSave(buildSavePayload({ nvidia_api_key: '' }));
+    setNvidiaApiKeyInput('');
+    setNvidiaTest(null);
+  };
+
+  const testNvidia = async () => {
+    setNvidiaTest(null);
+    if (nvidiaApiKeyInput.trim()) {
+      await onSave(buildSavePayload());
+      setNvidiaApiKeyInput('');
+    }
+    try {
+      const result = await api.testNvidia();
+      setNvidiaTest(result);
+    } catch (error) {
+      setNvidiaTest({ ok: false, message: error.message || 'NVIDIA test failed' });
     }
   };
 
@@ -325,6 +373,77 @@ export default function Settings({ settings: initialSettings, onSave }) {
         </section>
 
         <section className="mt-6 rounded-xl border border-gray-800 bg-[#12141c] p-4 md:p-6">
+          <h2 className="text-lg font-medium text-white">NVIDIA NIM</h2>
+          <p className="mt-1 text-sm text-gray-400">
+            Cloud models via{' '}
+            <a
+              href="https://build.nvidia.com/models"
+              target="_blank"
+              rel="noreferrer"
+              className="text-indigo-400 hover:text-indigo-300"
+            >
+              NVIDIA NIM
+            </a>
+            . Add the <strong className="font-medium text-gray-300">+ NVIDIA NIM</strong> provider
+            below, then browse the full catalog in Models. Optional{' '}
+            <code className="text-gray-300">NVIDIA_API_KEY</code> in <code className="text-gray-300">.env</code>.
+          </p>
+          <div className="mt-4 space-y-3">
+            <label className="block text-sm text-gray-300">
+              NVIDIA API key
+              {settings.nvidia_api_key_source === 'settings' && !nvidiaApiKeyInput && (
+                <span className="ml-2 text-green-400">Configured in app</span>
+              )}
+              {settings.nvidia_api_key_source === 'env' && !nvidiaApiKeyInput && (
+                <span className="ml-2 text-green-400">Configured via .env</span>
+              )}
+            </label>
+            <input
+              type="password"
+              value={nvidiaApiKeyInput}
+              onChange={(e) => setNvidiaApiKeyInput(e.target.value)}
+              placeholder={
+                settings.nvidia_api_key_source === 'settings'
+                  ? 'Key saved — enter a new key to replace'
+                  : settings.nvidia_api_key_source === 'env'
+                    ? 'Key from .env — enter here to override in app'
+                    : 'Paste your NVIDIA API key'
+              }
+              className="w-full rounded-md border border-gray-700 bg-[#0f1117] px-3 py-2 text-sm text-gray-300"
+              autoComplete="off"
+            />
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={testNvidia}
+                className="rounded-md bg-gray-800 px-3 py-1.5 text-sm text-gray-200 hover:bg-gray-700"
+              >
+                Test connection
+              </button>
+              {settings.nvidia_api_key_source === 'settings' && (
+                <button
+                  onClick={clearNvidiaKey}
+                  className="rounded-md bg-red-900/30 px-3 py-1.5 text-sm text-red-300 hover:bg-red-900/50"
+                >
+                  Clear saved key
+                </button>
+              )}
+            </div>
+            {settings.nvidia_api_key_source === 'env' && (
+              <p className="text-xs text-gray-500">
+                To remove the .env key, edit or delete{' '}
+                <code className="text-gray-400">NVIDIA_API_KEY</code> in your root{' '}
+                <code className="text-gray-400">.env</code> file and restart the app.
+              </p>
+            )}
+            {nvidiaTest && (
+              <div className={`text-sm ${nvidiaTest.ok ? 'text-green-400' : 'text-red-400'}`}>
+                {nvidiaTest.message}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-xl border border-gray-800 bg-[#12141c] p-4 md:p-6">
           <h2 className="text-lg font-medium text-white">Council presets</h2>
           <p className="mt-1 text-sm text-gray-400">
             Mini coding council uses tiny code models — run{' '}
@@ -350,6 +469,13 @@ export default function Settings({ settings: initialSettings, onSave }) {
               className="rounded-lg bg-gray-800 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700"
             >
               Cloud council (OpenRouter)
+            </button>
+            <button
+              onClick={() => applyCouncilPreset('nvidiaCloud')}
+              title="Requires NVIDIA NIM provider and API key; uses Standard profile"
+              className="rounded-lg bg-gray-800 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700"
+            >
+              NVIDIA cloud council
             </button>
           </div>
         </section>

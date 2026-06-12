@@ -10,6 +10,13 @@ from .providers.registry import ProviderRegistry
 
 
 POPULAR_MODELS = {
+    "nvidia": [
+        "meta/llama-3.1-70b-instruct",
+        "nvidia/llama-3.1-nemotron-70b-instruct",
+        "deepseek-ai/deepseek-r1",
+        "meta/llama-3.1-8b-instruct",
+        "google/gemma-2-9b-it",
+    ],
     "ollama": [
         "qwen2.5:0.5b",
         "qwen2.5:1.5b",

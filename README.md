@@ -24,7 +24,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 | **Tiny** (default) | 0.5–4B local models | Short prompts, token limits, trimmed context, simpler `RANK:` format |
 | **Standard** | Cloud / large models | Original longer prompts and full context |
 
-Switch profiles in **Settings**. Optional **Search the web first** (per message) uses [Serper](https://serper.dev) — add the key in **Settings → Web search** or in `.env`.
+Switch profiles in **Settings**. Optional **Search the web first** (per message) uses [Serper](https://serper.dev) — add the key in **Settings → Web search** or in `.env`. **NVIDIA NIM** cloud models use an API key from [build.nvidia.com](https://build.nvidia.com/models) — set in **Settings → NVIDIA NIM** or `.env`.
 
 ## Supported providers
 
@@ -32,7 +32,8 @@ Switch profiles in **Settings**. Optional **Search the web first** (per message)
 |----------|------|----------------|------------------|
 | Ollama | Yes | Pull via app | Auto on first use |
 | LM Studio | Yes | Download via app | Load/unload via app |
-| OpenRouter (cloud) | Yes | — | — |
+| OpenRouter (cloud) | Yes | Browse catalog | — |
+| NVIDIA NIM (cloud) | Yes | Browse full catalog | — |
 | LocalAI / vLLM | Yes | — | — |
 
 ## Test run checklist

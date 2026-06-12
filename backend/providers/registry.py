@@ -28,6 +28,14 @@ PROVIDER_PRESETS = [
         "preset": "openrouter",
     },
     {
+        "id": "nvidia",
+        "type": "openai_compatible",
+        "name": "NVIDIA NIM",
+        "base_url": "https://integrate.api.nvidia.com/v1",
+        "api_key_env": "NVIDIA_API_KEY",
+        "preset": "nvidia",
+    },
+    {
         "id": "ollama",
         "type": "openai_compatible",
         "name": "Ollama",

@@ -9,7 +9,7 @@ function providerBadge(providerId, settings) {
   const provider = settings?.providers?.find((p) => p.id === providerId);
   if (!provider) return 'Unknown';
   const preset = provider.preset || provider.type;
-  if (preset === 'openrouter') return 'Cloud';
+  if (preset === 'openrouter' || preset === 'nvidia') return 'Cloud';
   return 'Local';
 }
 

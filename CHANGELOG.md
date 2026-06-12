@@ -4,6 +4,20 @@ All notable changes to TinyLM Council are documented here.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-10
+
+### Added
+
+- **NVIDIA NIM cloud provider** — OpenAI-compatible access to the full hosted model catalog at [build.nvidia.com](https://build.nvidia.com/models)
+- **NVIDIA API key in Settings** — paste key in-app (with `.env` fallback), test connection, clear saved key
+- **`POST /api/nvidia/test`** — verify key and report model count
+- **Models: Cloud tab** — browse/search all NVIDIA and OpenRouter models; featured shortcuts for NVIDIA
+- **NVIDIA cloud council preset** — Standard profile with Llama 3.1 70B, Nemotron 70B, DeepSeek R1
+
+### Changed
+
+- Model Manager split into **Local** (Ollama, LM Studio) and **Cloud** (OpenRouter, NVIDIA NIM) provider groups
+
 ## [0.4.1] - 2026-06-10
 
 ### Added
@@ -76,6 +90,7 @@ All notable changes to TinyLM Council are documented here.
 - Windows launcher (`start.ps1`)
 - LM Studio council reliability improvements
 
+[0.5.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.5.0
 [0.4.1]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.4.1
 [0.4.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.3.0

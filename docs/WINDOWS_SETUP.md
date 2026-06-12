@@ -143,6 +143,14 @@ Inference still runs on the PC (or wherever your Ollama server is configured). T
 - **Web search** — check **Search the web first** before sending; add your Serper key in **Settings → Web search** or in `.env` ([serper.dev](https://serper.dev), ~2,500 free searches/month). Sources show in the **Web sources** panel. Council still runs if the key is missing (with a warning).
 - **Delete chats** — hover a conversation in the sidebar and click **×** (always visible on mobile).
 
+### NVIDIA NIM (optional cloud models)
+
+1. Get a free API key at [build.nvidia.com/models](https://build.nvidia.com/models).
+2. In **Settings → NVIDIA NIM**, paste the key and click **Test connection**.
+3. Under **Providers**, click **+ NVIDIA NIM** and **Save changes**.
+4. Open **Models → Cloud → NVIDIA NIM** to browse the full catalog (including large models).
+5. Use **Standard** council profile for 70B+ models, or apply **NVIDIA cloud council** preset.
+
 ## Manual start (without start.ps1)
 
 **Terminal 1 — backend:**

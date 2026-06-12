@@ -23,9 +23,24 @@ class OpenAICompatibleProvider:
         self.api_key = self._resolve_api_key()
 
     def _resolve_api_key(self) -> Optional[str]:
+        preset = (self.config.preset or "").lower()
+        if preset == "nvidia":
+            from ..settings import load_settings
+
+            settings = load_settings()
+            if settings.nvidia_api_key and settings.nvidia_api_key.strip():
+                return settings.nvidia_api_key.strip()
+            env_key = os.getenv("NVIDIA_API_KEY")
+            return env_key.strip() if env_key and env_key.strip() else None
         if not self.config.api_key_env:
             return None
         return os.getenv(self.config.api_key_env) or None
+
+    def _missing_nvidia_key_message(self) -> str:
+        return (
+            "Add your NVIDIA API key in Settings → NVIDIA NIM "
+            "or set NVIDIA_API_KEY in .env (free key at https://build.nvidia.com)"
+        )
 
     def _headers(self) -> Dict[str, str]:
         headers = {"Content-Type": "application/json"}
@@ -57,6 +72,17 @@ class OpenAICompatibleProvider:
                 native_api_available=True,
                 notes="Download/load requires LM Studio 0.4+ native API.",
             )
+        if preset == "nvidia":
+            return ProviderCapabilities(
+                can_list_models=True,
+                can_pull=False,
+                can_load=False,
+                can_unload=False,
+                can_delete=False,
+                can_list_running=False,
+                native_api_available=False,
+                notes="Cloud models via NVIDIA NIM API; browse catalog in Models and add to council.",
+            )
         return ProviderCapabilities(
             can_list_models=True,
             can_pull=False,
@@ -76,6 +102,8 @@ class OpenAICompatibleProvider:
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
     ) -> CompletionResult:
+        if (self.config.preset or "").lower() == "nvidia" and not self.api_key:
+            return CompletionResult(content="", error=self._missing_nvidia_key_message())
         payload = {"model": model, "messages": messages}
         if max_tokens is not None:
             payload["max_tokens"] = max_tokens
@@ -96,6 +124,8 @@ class OpenAICompatibleProvider:
             return CompletionResult(content="", error=str(exc))
 
     async def list_models(self) -> List[ModelInfo]:
+        if (self.config.preset or "").lower() == "nvidia" and not self.api_key:
+            return []
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(
@@ -114,6 +144,8 @@ class OpenAICompatibleProvider:
             return []
 
     async def test_connection(self) -> ConnectionTestResult:
+        if (self.config.preset or "").lower() == "nvidia" and not self.api_key:
+            return ConnectionTestResult(ok=False, message=self._missing_nvidia_key_message())
         start = time.perf_counter()
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
