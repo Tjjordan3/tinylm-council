@@ -42,13 +42,13 @@ const COUNCIL_PRESETS = {
   nvidiaCloud: {
     council_profile: 'standard',
     members: [
-      { provider_id: 'nvidia', model: 'meta/llama-3.1-70b-instruct', display_name: 'Llama 3.1 70B' },
+      { provider_id: 'nvidia', model: 'meta/llama-3.1-8b-instruct', display_name: 'Llama 3.1 8B' },
+      { provider_id: 'nvidia', model: 'google/gemma-2-9b-it', display_name: 'Gemma 2 9B' },
       {
         provider_id: 'nvidia',
-        model: 'nvidia/llama-3.1-nemotron-70b-instruct',
-        display_name: 'Nemotron 70B',
+        model: 'microsoft/phi-3-mini-128k-instruct',
+        display_name: 'Phi-3 Mini',
       },
-      { provider_id: 'nvidia', model: 'deepseek-ai/deepseek-r1', display_name: 'DeepSeek R1' },
     ],
   },
 };
@@ -472,7 +472,7 @@ export default function Settings({ settings: initialSettings, onSave }) {
             </button>
             <button
               onClick={() => applyCouncilPreset('nvidiaCloud')}
-              title="Requires NVIDIA NIM provider and API key; uses Standard profile"
+              title="Requires NVIDIA NIM provider and API key; Llama 8B, Gemma 9B, Phi-3 Mini"
               className="rounded-lg bg-gray-800 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700"
             >
               NVIDIA cloud council

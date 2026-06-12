@@ -149,7 +149,7 @@ Inference still runs on the PC (or wherever your Ollama server is configured). T
 2. In **Settings → NVIDIA NIM**, paste the key and click **Test connection**.
 3. Under **Providers**, click **+ NVIDIA NIM** and **Save changes**.
 4. Open **Models → Cloud → NVIDIA NIM** to browse the full catalog (including large models).
-5. Use **Standard** council profile for 70B+ models, or apply **NVIDIA cloud council** preset.
+5. Apply **NVIDIA cloud council** preset (Llama 8B, Gemma 9B, Phi-3 Mini), or browse **Models → Cloud** for larger models.
 
 ## Manual start (without start.ps1)
 
