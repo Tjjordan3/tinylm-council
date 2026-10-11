@@ -172,4 +172,56 @@ export const api = {
       throw error;
     }
   },
+
+  async regenerateChairmanStream(conversationId, onEvent, { signal } = {}) {
+    let reader;
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/conversations/${conversationId}/regenerate-chairman/stream`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal,
+        }
+      );
+      if (!response.ok) throw new Error('Failed to regenerate chairman');
+      reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let errorEvents = 0;
+      let completed = false;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const event = JSON.parse(line.slice(6));
+              if (event.type === 'error') errorEvents += 1;
+              if (event.type === 'complete') completed = true;
+              onEvent(event.type, event);
+            } catch {
+              /* ignore */
+            }
+          }
+        }
+      }
+      return { completed, errorEvents, aborted: false };
+    } catch (error) {
+      if (reader) {
+        try {
+          await reader.cancel();
+        } catch {
+          /* ignore */
+        }
+      }
+      if (error.name === 'AbortError' || signal?.aborted) {
+        return { completed: false, errorEvents: 0, aborted: true };
+      }
+      throw error;
+    }
+  },
 };

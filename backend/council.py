@@ -264,6 +264,8 @@ async def stage2_collect_rankings(
     stage1_results: List[Dict[str, Any]],
     profile: str,
     web_context: str = "",
+    on_member_complete: Optional[Callable[[Dict[str, Any]], None]] = None,
+    on_delta: Optional[Callable[[str, str], None]] = None,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, str], bool]:
     labels = [chr(65 + i) for i in range(len(stage1_results))]
     brief = build_shared_brief(stage1_results, profile, labels=labels)
@@ -296,7 +298,6 @@ async def stage2_collect_rankings(
     )
     messages = [{"role": "user", "content": ranking_prompt}]
     any_parse_failed = False
-    stage2_results = []
 
     successful_member_ids = {result.get("member_id") for result in stage1_results}
     ranking_members = [m for m in members if m.id in successful_member_ids]
@@ -305,25 +306,38 @@ async def stage2_collect_rankings(
 
     async def rank_member(member: CouncilMember) -> Optional[Dict[str, Any]]:
         nonlocal any_parse_failed
-        response = await _complete_with_limits(
-            registry, member, messages, "stage2", profile
+
+        def delta_cb(delta: str, mid: str = member.id) -> None:
+            if on_delta:
+                on_delta(mid, delta)
+
+        response = await _stream_with_limits(
+            registry,
+            member,
+            messages,
+            "stage2",
+            profile,
+            on_delta=delta_cb if on_delta else None,
         )
         if response.error:
-            return {
+            result = {
                 "member_id": member.id,
                 "model": member.model,
                 "display_name": _member_label(member),
                 "provider_id": member.provider_id,
-                "ranking": "",
+                "ranking": response.content or "",
                 "parsed_ranking": [],
                 "parse_failed": True,
                 "error": response.error,
             }
+            if on_member_complete:
+                on_member_complete(result)
+            return result
         full_text = response.content
         parsed, parse_failed = parse_ranking_with_fallback(full_text, available_labels)
         if parse_failed:
             any_parse_failed = True
-        return {
+        result = {
             "member_id": member.id,
             "model": member.model,
             "display_name": _member_label(member),
@@ -333,6 +347,9 @@ async def stage2_collect_rankings(
             "parse_failed": parse_failed,
             "error": None,
         }
+        if on_member_complete:
+            on_member_complete(result)
+        return result
 
     stage2_results = []
     for coro in asyncio.as_completed([rank_member(member) for member in ranking_members]):

@@ -10,7 +10,9 @@ export default function ChatInterface({
   conversation,
   onSendMessage,
   onStopConsultation,
+  onRegenerateChairman,
   isLoading,
+  regeneratingChairman = false,
   settings,
 }) {
   const [input, setInput] = useState('');
@@ -169,28 +171,23 @@ export default function ChatInterface({
     </div>
   );
 
-  if (!conversation) {
-    return (
-      <main className="brand-empty flex flex-1 flex-col items-center justify-center px-6 text-center">
-        <h1 className="brand-mark">TinyLM Council</h1>
-        <p className="mt-3 max-w-md text-[var(--muted)]">
-          Small models confer, then a chairman delivers one answer. Start a new conversation from
-          the sidebar.
-        </p>
-      </main>
-    );
-  }
+  const messageList = conversation?.messages || [];
+  const showBrandHero = !conversation || messageList.length === 0;
 
   return (
     <main className="flex flex-1 flex-col overflow-hidden">
       <div className="flex-1 overflow-y-auto p-4 md:p-6">
-        {conversation.messages.length === 0 ? (
+        {showBrandHero ? (
           <div className="brand-empty flex h-full flex-col items-center justify-center text-center">
             <h1 className="brand-mark">TinyLM Council</h1>
-            <p className="mt-3 text-[var(--muted)]">Ask a question to consult the council.</p>
+            <p className="mt-3 max-w-md text-[var(--muted)]">
+              Small models confer, then a chairman delivers one answer.
+            </p>
           </div>
         ) : (
-          conversation.messages.map((msg, index) => {
+          messageList.map((msg, index) => {
+            const isLastAssistant =
+              msg.role === 'assistant' && index === messageList.length - 1;
             const run = msg.metadata?.run_mode || 'full';
             const mode =
               run === 'quick'
@@ -262,7 +259,19 @@ export default function ChatInterface({
                         />
                       ))}
 
-                    {msg.stage3 && <Stage3 result={msg.stage3} />}
+                    {msg.stage3 && (
+                      <Stage3
+                        result={msg.stage3}
+                        canRegenerate={
+                          isLastAssistant &&
+                          !isLoading &&
+                          !regeneratingChairman &&
+                          !!msg.stage1?.length
+                        }
+                        regenerating={isLastAssistant && regeneratingChairman}
+                        onRegenerate={onRegenerateChairman}
+                      />
+                    )}
                   </div>
                 )}
               </div>

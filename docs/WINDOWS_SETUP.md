@@ -177,10 +177,15 @@ Use this when you want models to argue before a final consensus, instead of only
 ## Using the app
 
 - **Stop button** — appears while a consultation runs; cancels the current council and clears partial results.
+- **Streaming** (v0.8.0+) — member answers, peer rankings/debate, and the final answer appear token-by-token.
+- **Quick answer** — composer **Run → Quick (skip deliberation)** goes Stage 1 → chairman only. Defaults live under **Settings → Run defaults**.
+- **Members** — composer can cap a run to 2–4 enabled models (or use all enabled).
+- **Regenerate chairman** — on a finished reply, **Regenerate chairman** re-runs Stage 3 only (keeps Stage 1 / deliberation).
 - **Deliberation mode** — see [Debate mode (summary)](#debate-mode-summary) above; ranked peer review is the default.
+- **Empty chat** — type in the composer with no conversation selected; a new chat is created on Send.
 - **One at a time** — wait for a run to finish (or stop it) before sending another question.
 - **Failed models** — one bad model does not stop the council; remove unreliable models in Settings.
-- **Web search** — check **Search the web first** before sending; add your Serper key in **Settings → Web search** or in `.env` ([serper.dev](https://serper.dev), ~2,500 free searches/month). Sources show in the **Web sources** panel. Council still runs if the key is missing (with a warning).
+- **Web search** — check **Search the web first** before sending; add your Serper key in **Settings → Web search** or in `.env` ([serper.dev](https://serper.dev), ~2,500 free searches/month). Sources show in the **Web sources** panel. Council still runs if the key is missing (with a warning). Optional **Skip search when not needed** in Settings uses a small heuristic when the toggle is on.
 - **Delete chats** — hover a conversation in the sidebar and click **×** (always visible on mobile).
 
 ### NVIDIA NIM (optional cloud models)

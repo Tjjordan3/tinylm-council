@@ -17,12 +17,16 @@ All notable changes to TinyLM Council are documented here.
 - **Web search auto-skip** — optional heuristic to skip Serper on greetings/opinions/coding without freshness cues
 - **Stage elapsed timers** and timeline-style progress chrome
 - **Visual refresh** — amber/copper accent, IBM Plex typography, slate gradient atmosphere, final-answer-first layout
+- **Stage 2 rank streaming** — peer-review rankings stream like Stage 1 / debate
+- **Regenerate chairman** — re-run Stage 3 only from a finished answer (seeds Stage 1 cache for retries)
+- **Brand empty state + composer** — send without pre-creating a conversation; chat is created on Send
 
 ### Changed
 
 - **Shared httpx clients** — connection reuse across provider and search calls
 - **Stop / cancel** — SSE disconnect cancels in-flight council tasks and releases the council lock
 - **Local concurrency** — Tiny profile defaults to 2 concurrent local calls; “Allow more parallel local requests” raises that to 4
+- **Desktop docs** — Quick mode, streaming, and regenerate chairman covered in Windows guides
 
 ## [0.7.1] - 2026-10-11
 

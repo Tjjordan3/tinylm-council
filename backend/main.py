@@ -383,6 +383,136 @@ async def delete_conversation(conversation_id: str):
     return {"ok": True}
 
 
+@app.post("/api/conversations/{conversation_id}/regenerate-chairman/stream")
+async def regenerate_chairman_stream(conversation_id: str):
+    """Re-run Stage 3 only, reusing stored Stage 1 / deliberation (and Stage 1 cache on retries)."""
+    conversation = storage.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    messages = conversation.get("messages") or []
+    assistant_index = None
+    for index in range(len(messages) - 1, -1, -1):
+        if messages[index].get("role") == "assistant":
+            assistant_index = index
+            break
+    if assistant_index is None or assistant_index == 0:
+        raise HTTPException(status_code=400, detail="No completed council answer to regenerate")
+
+    assistant_msg = messages[assistant_index]
+    user_msg = messages[assistant_index - 1]
+    if user_msg.get("role") != "user":
+        raise HTTPException(status_code=400, detail="Assistant message has no preceding user question")
+
+    stage1_results = assistant_msg.get("stage1") or []
+    if not stage1_results:
+        raise HTTPException(status_code=400, detail="No Stage 1 answers available to regenerate from")
+
+    registry = get_registry()
+    settings = load_settings()
+    profile = settings.council_profile or "tiny"
+    metadata = assistant_msg.get("metadata") or {}
+    mode = (metadata.get("deliberation_mode") or "rank").strip().lower()
+    run_mode = (metadata.get("run_mode") or "full").strip().lower()
+    if run_mode == "quick":
+        mode = "quick"
+    if mode not in ("rank", "debate", "quick"):
+        mode = "rank"
+    stage2_results = assistant_msg.get("stage2") or []
+    debate_rounds_data = assistant_msg.get("debate_rounds") or []
+    aggregate_rankings = metadata.get("aggregate_rankings") or []
+    web_context = ""
+    web_meta = metadata.get("web_search") or {}
+    # Prefer reconstructed brief from stored sources when available
+    if web_meta.get("context_text"):
+        web_context = web_meta["context_text"]
+    chairman = settings.get_chairman()
+    user_query = user_msg.get("content") or ""
+
+    async def event_generator():
+        if _council_lock.locked():
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Council is busy with another request. Please wait for it to finish.'})}\n\n"
+            return
+
+        async with _council_lock:
+            try:
+                if not chairman:
+                    yield f"data: {json.dumps({'type': 'error', 'message': 'No chairman configured.'})}\n\n"
+                    return
+
+                # Seed Stage 1 cache so a full re-run of the same question can reuse answers
+                for result in stage1_results:
+                    if not result.get("success") and result.get("error"):
+                        continue
+                    mid = result.get("member_id")
+                    model = result.get("model")
+                    if not mid or not model:
+                        continue
+                    cache_set_stage1(
+                        stage1_cache_key(mid, model, profile, user_query, web_context),
+                        {
+                            "member_id": mid,
+                            "model": model,
+                            "display_name": result.get("display_name") or model,
+                            "provider_id": result.get("provider_id"),
+                            "response": result.get("response") or "",
+                            "error": None,
+                            "success": True,
+                        },
+                    )
+
+                yield f"data: {json.dumps({'type': 'stage3_start', 'regenerate': True})}\n\n"
+                pending: List[dict] = []
+
+                def on_delta(delta: str) -> None:
+                    pending.append({"type": "stage3_delta", "delta": delta})
+
+                stage3_result = None
+                async for item in _iter_with_keepalive(
+                    stage3_synthesize_final_stream(
+                        registry,
+                        chairman,
+                        user_query,
+                        stage1_results,
+                        stage2_results,
+                        aggregate_rankings,
+                        profile,
+                        web_context=web_context,
+                        deliberation_mode=mode,
+                        debate_rounds=debate_rounds_data,
+                        on_delta=on_delta,
+                    )
+                ):
+                    while pending:
+                        event = pending.pop(0)
+                        yield f"data: {json.dumps(event)}\n\n"
+                    if item is None:
+                        yield ": keepalive\n\n"
+                    else:
+                        stage3_result = item
+                while pending:
+                    event = pending.pop(0)
+                    yield f"data: {json.dumps(event)}\n\n"
+
+                storage.update_last_assistant_stage3(
+                    conversation_id,
+                    stage3_result,
+                    metadata_patch={"regenerated_chairman": True},
+                )
+                yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result, 'regenerate': True})}\n\n"
+                yield f"data: {json.dumps({'type': 'complete', 'regenerate': True})}\n\n"
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
+
+
 @app.post("/api/conversations/{conversation_id}/message/stream")
 async def send_message_stream(conversation_id: str, request: SendMessageRequest):
     conversation = storage.get_conversation(conversation_id)
@@ -662,6 +792,22 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                     yield f"data: {json.dumps({'type': 'debate_complete', 'data': debate_rounds_data, 'metadata': {'label_to_model': label_to_model, 'deliberation_mode': 'debate', 'debate_rounds_count': len(debate_rounds_data)}})}\n\n"
                 else:
                     yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
+                    pending_rank_events: List[dict] = []
+
+                    def on_rank_member(result: dict) -> None:
+                        pending_rank_events.append(
+                            {"type": "stage2_member_complete", "data": result}
+                        )
+
+                    def on_rank_delta(member_id: str, delta: str) -> None:
+                        pending_rank_events.append(
+                            {
+                                "type": "stage2_member_delta",
+                                "member_id": member_id,
+                                "delta": delta,
+                            }
+                        )
+
                     async for item in _iter_with_keepalive(
                         stage2_collect_rankings(
                             registry,
@@ -670,12 +816,20 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                             stage1_results,
                             profile,
                             web_context=web_context,
+                            on_member_complete=on_rank_member,
+                            on_delta=on_rank_delta,
                         )
                     ):
+                        while pending_rank_events:
+                            event = pending_rank_events.pop(0)
+                            yield f"data: {json.dumps(event)}\n\n"
                         if item is None:
                             yield ": keepalive\n\n"
                         else:
                             stage2_results, label_to_model, ranking_parse_failed = item
+                    while pending_rank_events:
+                        event = pending_rank_events.pop(0)
+                        yield f"data: {json.dumps(event)}\n\n"
                     aggregate_rankings = calculate_aggregate_rankings(
                         stage2_results, label_to_model
                     )

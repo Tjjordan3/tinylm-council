@@ -12,6 +12,7 @@ export default function App() {
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [currentConversation, setCurrentConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const [settings, setSettings] = useState(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -27,10 +28,12 @@ export default function App() {
     const buffer = deltaBufferRef.current;
     deltaBufferRef.current = {};
     const stage1Deltas = buffer.stage1 || {};
+    const stage2Deltas = buffer.stage2 || {};
     const debateDeltas = buffer.debate || {};
     const stage3Delta = buffer.stage3 || '';
     if (
       !Object.keys(stage1Deltas).length &&
+      !Object.keys(stage2Deltas).length &&
       !Object.keys(debateDeltas).length &&
       !stage3Delta
     ) {
@@ -43,6 +46,7 @@ export default function App() {
 
       let allStage1 = lastMsg.allStage1 || [];
       let stage1 = lastMsg.stage1;
+      let stage2 = lastMsg.stage2;
       let debateRounds = lastMsg.debateRounds;
       let stage3 = lastMsg.stage3;
       let memberStatuses = { ...(lastMsg.memberStatuses || {}) };
@@ -72,6 +76,33 @@ export default function App() {
           status: 'running',
         };
         stage1 = allStage1.filter((r) => r.success !== false && (r.response || r.streaming));
+      }
+
+      for (const [memberId, delta] of Object.entries(stage2Deltas)) {
+        const existing = [...(stage2 || [])];
+        const idx = existing.findIndex((r) => r.member_id === memberId);
+        if (idx >= 0) {
+          existing[idx] = {
+            ...existing[idx],
+            ranking: (existing[idx].ranking || '') + delta,
+            streaming: true,
+          };
+        } else {
+          const meta = memberStatuses[memberId] || {};
+          existing.push({
+            member_id: memberId,
+            display_name: meta.display_name,
+            model: meta.model,
+            ranking: delta,
+            parsed_ranking: [],
+            streaming: true,
+          });
+        }
+        stage2 = existing;
+        memberStatuses[memberId] = {
+          ...(memberStatuses[memberId] || {}),
+          status: 'running',
+        };
       }
 
       for (const key of Object.keys(debateDeltas)) {
@@ -123,6 +154,7 @@ export default function App() {
       return updateLastAssistantMessage(prev, {
         allStage1,
         stage1,
+        stage2,
         debateRounds,
         stage3,
         memberStatuses,
@@ -136,6 +168,11 @@ export default function App() {
       deltaBufferRef.current.stage1 = deltaBufferRef.current.stage1 || {};
       deltaBufferRef.current.stage1[memberId] =
         (deltaBufferRef.current.stage1[memberId] || '') + delta;
+    } else if (kind === 'stage2') {
+      const { memberId, delta } = payload;
+      deltaBufferRef.current.stage2 = deltaBufferRef.current.stage2 || {};
+      deltaBufferRef.current.stage2[memberId] =
+        (deltaBufferRef.current.stage2[memberId] || '') + delta;
     } else if (kind === 'debate') {
       const { round, memberId, delta } = payload;
       const key = `${round}::${memberId}`;
@@ -250,6 +287,101 @@ export default function App() {
     abortControllerRef.current?.abort();
   };
 
+  const handleRegenerateChairman = async () => {
+    if (!currentConversationId || isLoading || isRegenerating) return;
+    setIsRegenerating(true);
+    setIsLoading(true);
+    deltaBufferRef.current = {};
+    if (deltaRafRef.current != null) {
+      cancelAnimationFrame(deltaRafRef.current);
+      deltaRafRef.current = null;
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    const previousStage3 = currentConversation?.messages?.length
+      ? currentConversation.messages[currentConversation.messages.length - 1]?.stage3
+      : null;
+
+    setCurrentConversation((prev) =>
+      updateLastAssistantMessage(prev, {
+        stage3: {
+          ...(previousStage3 || {}),
+          response: '',
+          streaming: true,
+        },
+        loading: {
+          ...(prev.messages[prev.messages.length - 1].loading || {}),
+          stage3: true,
+        },
+      })
+    );
+
+    try {
+      const result = await api.regenerateChairmanStream(
+        currentConversationId,
+        (eventType, event) => {
+          switch (eventType) {
+            case 'stage3_delta':
+              queueDelta('stage3', { delta: event.delta || '' });
+              break;
+            case 'stage3_complete':
+              flushDeltaBuffer();
+              setCurrentConversation((prev) =>
+                updateLastAssistantMessage(prev, {
+                  stage3: { ...event.data, streaming: false },
+                  loading: {
+                    ...(prev.messages[prev.messages.length - 1].loading || {}),
+                    stage3: false,
+                  },
+                })
+              );
+              break;
+            case 'error':
+              alert(event.message);
+              break;
+            default:
+              break;
+          }
+        },
+        { signal: controller.signal }
+      );
+      if (result.aborted) {
+        setCurrentConversation((prev) =>
+          updateLastAssistantMessage(prev, {
+            stage3: previousStage3,
+            loading: {
+              ...(prev.messages[prev.messages.length - 1].loading || {}),
+              stage3: false,
+            },
+          })
+        );
+        return;
+      }
+      if (result.completed) {
+        await loadConversation(currentConversationId);
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        console.error('Failed to regenerate chairman:', error);
+        alert(error.message || 'Failed to regenerate chairman');
+      }
+      setCurrentConversation((prev) =>
+        updateLastAssistantMessage(prev, {
+          stage3: previousStage3,
+          loading: {
+            ...(prev.messages[prev.messages.length - 1]?.loading || {}),
+            stage3: false,
+          },
+        })
+      );
+    } finally {
+      abortControllerRef.current = null;
+      setIsRegenerating(false);
+      setIsLoading(false);
+    }
+  };
+
   const handleSendMessage = async (content, options = {}) => {
     const useWebSearch = typeof options === 'boolean' ? options : !!options.useWebSearch;
     const deliberationMode =
@@ -269,7 +401,29 @@ export default function App() {
         ? options.maxMembers
         : settings?.default_max_members;
 
-    if (!currentConversationId) return;
+    let conversationId = currentConversationId;
+    if (!conversationId) {
+      try {
+        const newConv = await api.createConversation();
+        setConversations((prev) => [
+          {
+            id: newConv.id,
+            created_at: newConv.created_at,
+            title: newConv.title,
+            message_count: 0,
+          },
+          ...prev,
+        ]);
+        setCurrentConversationId(newConv.id);
+        setCurrentConversation(newConv);
+        conversationId = newConv.id;
+      } catch (error) {
+        console.error('Failed to create conversation:', error);
+        alert('Could not start a conversation.');
+        return;
+      }
+    }
+
     setIsLoading(true);
     deltaBufferRef.current = {};
     if (deltaRafRef.current != null) {
@@ -313,7 +467,7 @@ export default function App() {
       let streamCompleted = false;
       let streamErrored = false;
       const streamResult = await api.sendMessageStream(
-        currentConversationId,
+        conversationId,
         content,
         (eventType, event) => {
         switch (eventType) {
@@ -423,6 +577,7 @@ export default function App() {
           case 'stage2_start':
             setCurrentConversation((prev) =>
               updateLastAssistantMessage(prev, {
+                stage2: [],
                 loading: {
                   ...(prev.messages[prev.messages.length - 1].loading || {}),
                   stage2: true,
@@ -434,6 +589,35 @@ export default function App() {
               })
             );
             break;
+          case 'stage2_member_delta':
+            queueDelta('stage2', { memberId: event.member_id, delta: event.delta || '' });
+            break;
+          case 'stage2_member_complete': {
+            flushDeltaBuffer();
+            const data = event.data;
+            setCurrentConversation((prev) => {
+              const lastMsg = prev.messages[prev.messages.length - 1];
+              const existing = [...(lastMsg.stage2 || [])];
+              const idx = existing.findIndex((r) => r.member_id === data.member_id);
+              const next = { ...data, streaming: false };
+              if (idx >= 0) existing[idx] = next;
+              else existing.push(next);
+              return updateLastAssistantMessage(prev, {
+                stage2: existing,
+                memberStatuses: {
+                  ...(lastMsg.memberStatuses || {}),
+                  [data.member_id]: {
+                    ...(lastMsg.memberStatuses?.[data.member_id] || {}),
+                    display_name: data.display_name,
+                    model: data.model,
+                    status: data.error ? 'failed' : 'done',
+                    error: data.error,
+                  },
+                },
+              });
+            });
+            break;
+          }
           case 'stage2_skipped':
             setCurrentConversation((prev) =>
               updateLastAssistantMessage(prev, {
@@ -451,6 +635,7 @@ export default function App() {
             );
             break;
           case 'stage2_complete':
+            flushDeltaBuffer();
             setCurrentConversation((prev) =>
               updateLastAssistantMessage(prev, {
                 stage2: event.data,
@@ -610,12 +795,12 @@ export default function App() {
           ...prev,
           messages: prev.messages.slice(0, -2),
         }));
-        await loadConversation(currentConversationId);
+        await loadConversation(conversationId);
         return;
       }
 
       if (streamResult.completed || streamCompleted) {
-        await loadConversation(currentConversationId);
+        await loadConversation(conversationId);
       } else if (!streamResult.completed && !streamCompleted) {
         if (!streamErrored) {
           alert(
@@ -626,7 +811,7 @@ export default function App() {
           ...prev,
           messages: prev.messages.slice(0, -2),
         }));
-        await loadConversation(currentConversationId);
+        await loadConversation(conversationId);
       }
     } catch (error) {
       if (error.name === 'AbortError') {
@@ -634,7 +819,7 @@ export default function App() {
           ...prev,
           messages: prev.messages.slice(0, -2),
         }));
-        await loadConversation(currentConversationId);
+        await loadConversation(conversationId);
         return;
       }
       console.error('Failed to send message:', error);
@@ -709,7 +894,9 @@ export default function App() {
               conversation={currentConversation}
               onSendMessage={handleSendMessage}
               onStopConsultation={handleStopConsultation}
+              onRegenerateChairman={handleRegenerateChairman}
               isLoading={isLoading}
+              regeneratingChairman={isRegenerating}
               settings={settings}
             />
           }

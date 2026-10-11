@@ -45,9 +45,9 @@ export default function Stage2({
             Each member evaluated anonymized responses and ranked them. Names are shown for readability.
           </p>
 
-          {(!hasContent || hasErrors) && (
+          {((!hasContent && !rankings.some((r) => r.streaming)) || hasErrors) && (
             <div className="mt-3 rounded-md bg-amber-900/20 px-3 py-2 text-sm text-amber-300">
-              {!hasContent
+              {!hasContent && !rankings.some((r) => r.streaming)
                 ? 'Rankings came back empty. With LM Studio, ensure each council model is installed and the server is running. Try reloading models in LM Studio or use fewer council members.'
                 : 'Some members failed to rank responses.'}
               {rankings

@@ -1,10 +1,10 @@
 import ReactMarkdown from 'react-markdown';
 
-export default function Stage3({ result }) {
+export default function Stage3({ result, onRegenerate, regenerating = false, canRegenerate = false }) {
   if (!result) return null;
 
   const text = (result.response || '').trim();
-  const streaming = !!result.streaming;
+  const streaming = !!result.streaming || regenerating;
   const hasError = !streaming && (result.error || !text);
 
   return (
@@ -17,6 +17,15 @@ export default function Stage3({ result }) {
           </span>
         )}
         {streaming && <span className="text-xs text-[var(--accent)]">Writing…</span>}
+        {canRegenerate && !streaming && (
+          <button
+            type="button"
+            onClick={onRegenerate}
+            className="ml-auto rounded-lg border border-[var(--border)] px-3 py-1 text-xs text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+          >
+            Regenerate chairman
+          </button>
+        )}
       </div>
       {hasError ? (
         <div className="text-sm text-amber-300">
