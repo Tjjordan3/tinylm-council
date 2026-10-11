@@ -155,6 +155,7 @@ Inference still runs on the PC (or wherever your Ollama server is configured). T
 ## Using the app
 
 - **Stop button** — appears while a consultation runs; cancels the current council and clears partial results.
+- **Deliberation mode** — in Settings (or the chat Mode control): **Ranked peer review** or **Debate** (members rebut for 1–3 rounds before the chairman).
 - **One at a time** — wait for a run to finish (or stop it) before sending another question.
 - **Failed models** — one bad model does not stop the council; remove unreliable models in Settings.
 - **Web search** — check **Search the web first** before sending; add your Serper key in **Settings → Web search** or in `.env` ([serper.dev](https://serper.dev), ~2,500 free searches/month). Sources show in the **Web sources** panel. Council still runs if the key is missing (with a warning).

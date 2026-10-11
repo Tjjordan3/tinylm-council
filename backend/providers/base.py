@@ -94,6 +94,8 @@ class AppSettings:
     council_members: List[CouncilMember] = field(default_factory=list)
     chairman_member_id: Optional[str] = None
     council_profile: str = "tiny"
+    deliberation_mode: str = "rank"
+    debate_rounds: int = 1
     setup_complete: bool = False
     serper_api_key: Optional[str] = None
     nvidia_api_key: Optional[str] = None

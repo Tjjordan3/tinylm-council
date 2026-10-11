@@ -89,15 +89,23 @@ export const api = {
     }
   },
 
-  async sendMessageStream(conversationId, content, onEvent, { signal, useWebSearch = false } = {}) {
+  async sendMessageStream(
+    conversationId,
+    content,
+    onEvent,
+    { signal, useWebSearch = false, deliberationMode, debateRounds } = {}
+  ) {
     let reader;
     try {
+      const body = { content, use_web_search: useWebSearch };
+      if (deliberationMode) body.deliberation_mode = deliberationMode;
+      if (debateRounds != null) body.debate_rounds = debateRounds;
       const response = await fetch(
         `${API_BASE}/api/conversations/${conversationId}/message/stream`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content, use_web_search: useWebSearch }),
+          body: JSON.stringify(body),
           signal,
         }
       );

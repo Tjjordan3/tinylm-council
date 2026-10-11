@@ -28,8 +28,10 @@ Release notes: [CHANGELOG.md](CHANGELOG.md).
 ## How it works
 
 1. **Stage 1 — First opinions:** Your question goes to all council members in parallel.
-2. **Stage 2 — Peer review:** Each member anonymously ranks the others' answers.
-3. **Stage 3 — Final answer:** The chairman compiles everything into one response.
+2. **Stage 2 — Deliberation** (choose in Settings or per message):
+   - **Ranked peer review** (default): each member anonymously ranks the others' answers.
+   - **Debate:** members rebut each other for 1–3 rounds, then revise their positions.
+3. **Stage 3 — Final answer:** The chairman compiles everything into one consensus response.
 
 ## Tiny vs Standard profile
 

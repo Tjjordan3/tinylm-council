@@ -117,7 +117,17 @@ export default function App() {
     abortControllerRef.current?.abort();
   };
 
-  const handleSendMessage = async (content, useWebSearch = false) => {
+  const handleSendMessage = async (content, options = {}) => {
+    const useWebSearch = typeof options === 'boolean' ? options : !!options.useWebSearch;
+    const deliberationMode =
+      typeof options === 'object' && options.deliberationMode
+        ? options.deliberationMode
+        : settings?.deliberation_mode || 'rank';
+    const debateRounds =
+      typeof options === 'object' && options.debateRounds != null
+        ? options.debateRounds
+        : settings?.debate_rounds;
+
     if (!currentConversationId) return;
     setIsLoading(true);
 
@@ -136,13 +146,15 @@ export default function App() {
         stage1: null,
         stage2: null,
         stage3: null,
-        metadata: null,
+        debateRounds: null,
+        metadata: { deliberation_mode: deliberationMode },
         webSearch: null,
         memberStatuses: {},
         loading: {
           webSearch: useWebSearch,
           stage1: false,
           stage2: false,
+          debate: false,
           stage3: false,
         },
       };
@@ -203,8 +215,18 @@ export default function App() {
                 memberStatuses[m.id] = { status: 'waiting', ...m };
               }
               return updateLastAssistantMessage(prev, {
-                loading: { webSearch: false, stage1: true, stage2: false, stage3: false },
+                loading: {
+                  webSearch: false,
+                  stage1: true,
+                  stage2: false,
+                  debate: false,
+                  stage3: false,
+                },
                 memberStatuses,
+                metadata: {
+                  ...(prev.messages[prev.messages.length - 1].metadata || {}),
+                  deliberation_mode: event.deliberation_mode || deliberationMode,
+                },
               });
             });
             break;
@@ -255,10 +277,82 @@ export default function App() {
             setCurrentConversation((prev) =>
               updateLastAssistantMessage(prev, {
                 stage2: event.data,
-                metadata: event.metadata,
+                metadata: {
+                  ...(prev.messages[prev.messages.length - 1].metadata || {}),
+                  ...(event.metadata || {}),
+                  deliberation_mode: 'rank',
+                },
                 loading: {
                   ...(prev.messages[prev.messages.length - 1].loading || {}),
                   stage2: false,
+                },
+              })
+            );
+            break;
+          case 'debate_start':
+            setCurrentConversation((prev) =>
+              updateLastAssistantMessage(prev, {
+                debateRounds: [],
+                loading: {
+                  ...(prev.messages[prev.messages.length - 1].loading || {}),
+                  debate: true,
+                  stage2: false,
+                },
+                metadata: {
+                  ...(prev.messages[prev.messages.length - 1].metadata || {}),
+                  deliberation_mode: 'debate',
+                },
+              })
+            );
+            break;
+          case 'debate_member_complete': {
+            const data = event.data;
+            const roundNum = event.round;
+            setCurrentConversation((prev) => {
+              const lastMsg = prev.messages[prev.messages.length - 1];
+              const existing = [...(lastMsg.debateRounds || [])];
+              let roundEntry = existing.find((r) => r.round === roundNum);
+              if (!roundEntry) {
+                roundEntry = { round: roundNum, results: [] };
+                existing.push(roundEntry);
+                existing.sort((a, b) => a.round - b.round);
+              }
+              const results = [...(roundEntry.results || [])];
+              const idx = results.findIndex((r) => r.member_id === data.member_id);
+              if (idx >= 0) results[idx] = data;
+              else results.push(data);
+              roundEntry = { ...roundEntry, results };
+              const nextRounds = existing.map((r) =>
+                r.round === roundNum ? roundEntry : r
+              );
+              return updateLastAssistantMessage(prev, {
+                debateRounds: nextRounds,
+                memberStatuses: {
+                  ...(lastMsg.memberStatuses || {}),
+                  [data.member_id]: {
+                    ...(lastMsg.memberStatuses?.[data.member_id] || {}),
+                    display_name: data.display_name,
+                    model: data.model,
+                    status: data.success ? 'done' : 'failed',
+                    error: data.error,
+                  },
+                },
+              });
+            });
+            break;
+          }
+          case 'debate_complete':
+            setCurrentConversation((prev) =>
+              updateLastAssistantMessage(prev, {
+                debateRounds: event.data,
+                metadata: {
+                  ...(prev.messages[prev.messages.length - 1].metadata || {}),
+                  ...(event.metadata || {}),
+                  deliberation_mode: 'debate',
+                },
+                loading: {
+                  ...(prev.messages[prev.messages.length - 1].loading || {}),
+                  debate: false,
                 },
               })
             );
@@ -300,7 +394,12 @@ export default function App() {
             break;
         }
       },
-        { signal: controller.signal, useWebSearch }
+        {
+          signal: controller.signal,
+          useWebSearch,
+          deliberationMode,
+          debateRounds,
+        }
       );
 
       if (streamResult.aborted) {

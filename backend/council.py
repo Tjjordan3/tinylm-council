@@ -12,11 +12,13 @@ from .context_utils import (
     truncate_text,
 )
 from .prompts import (
+    build_debate_round_prompt,
     build_stage1_messages,
     build_stage2_prompt,
     build_stage3_prompt,
     build_title_prompt,
     get_stage_limits,
+    summarize_debate_for_stage3,
 )
 from .providers.base import CouncilMember, ProviderConfig
 from .providers.registry import ProviderRegistry
@@ -208,6 +210,112 @@ async def stage2_collect_rankings(
     return stage2_results, label_to_model, any_parse_failed
 
 
+async def stage2_run_debate_rounds(
+    registry: ProviderRegistry,
+    members: List[CouncilMember],
+    user_query: str,
+    stage1_results: List[Dict[str, Any]],
+    profile: str,
+    debate_rounds: int = 1,
+    web_context: str = "",
+    on_member_complete: Optional[Callable[[int, Dict[str, Any]], None]] = None,
+) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
+    """Run structured anonymized debate rounds; returns (rounds, label_to_model)."""
+    rounds_count = max(1, min(3, int(debate_rounds or 1)))
+    positions = {
+        result["member_id"]: {
+            "member_id": result["member_id"],
+            "model": result["model"],
+            "display_name": result.get("display_name") or result["model"],
+            "provider_id": result.get("provider_id"),
+            "response": result.get("response") or "",
+        }
+        for result in stage1_results
+        if result.get("success") and result.get("member_id")
+    }
+    if len(positions) < 2:
+        return [], {}
+
+    ordered_ids = [result["member_id"] for result in stage1_results if result["member_id"] in positions]
+    labels = [chr(65 + i) for i in range(len(ordered_ids))]
+    id_to_label = {
+        member_id: f"Response {label}" for member_id, label in zip(ordered_ids, labels)
+    }
+    label_to_model = {
+        id_to_label[member_id]: positions[member_id]["display_name"]
+        for member_id in ordered_ids
+    }
+
+    member_by_id = {member.id: member for member in members}
+    debate_history: List[Dict[str, Any]] = []
+
+    for round_number in range(1, rounds_count + 1):
+        async def debate_member(
+            member_id: str, current_round: int = round_number
+        ) -> Dict[str, Any]:
+            pos = positions[member_id]
+            member = member_by_id.get(member_id)
+            if not member:
+                return {
+                    **pos,
+                    "response": "",
+                    "error": "member_not_found",
+                    "success": False,
+                }
+
+            own_label = id_to_label[member_id]
+            own_text = pos["response"]
+            if profile == "tiny":
+                own_text = truncate_text(own_text, 600)
+
+            others = []
+            for other_id in ordered_ids:
+                if other_id == member_id:
+                    continue
+                other_text = positions[other_id]["response"]
+                if profile == "tiny":
+                    other_text = truncate_text(other_text, 600)
+                others.append({"label": id_to_label[other_id], "text": other_text})
+
+            prompt = build_debate_round_prompt(
+                user_query,
+                own_label,
+                own_text,
+                others,
+                current_round,
+                profile,
+                web_context=web_context,
+            )
+            messages = [{"role": "user", "content": prompt}]
+            response = await _complete_with_limits(
+                registry, member, messages, "debate", profile
+            )
+            result = {
+                "member_id": member.id,
+                "model": member.model,
+                "display_name": _member_label(member),
+                "provider_id": member.provider_id,
+                "response": response.content if not response.error else "",
+                "error": response.error,
+                "success": response.error is None,
+                "label": own_label,
+            }
+            if on_member_complete:
+                on_member_complete(current_round, result)
+            return result
+
+        round_results = list(
+            await asyncio.gather(*[debate_member(mid) for mid in ordered_ids])
+        )
+        for result in round_results:
+            if result.get("success") and result.get("response"):
+                positions[result["member_id"]]["response"] = result["response"]
+
+        debate_history.append({"round": round_number, "results": round_results})
+
+    return debate_history, label_to_model
+
+
 async def stage3_synthesize_final(
     registry: ProviderRegistry,
     chairman: CouncilMember,
@@ -217,6 +325,8 @@ async def stage3_synthesize_final(
     aggregate_rankings: List[Dict[str, Any]],
     profile: str,
     web_context: str = "",
+    deliberation_mode: str = "rank",
+    debate_rounds: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     stage1_input = stage1_results
     if profile == "tiny":
@@ -228,7 +338,10 @@ async def stage3_synthesize_final(
             for result in stage1_results
         ]
 
-    if profile == "tiny":
+    mode = (deliberation_mode or "rank").strip().lower()
+    if mode == "debate":
+        stage2_summary = summarize_debate_for_stage3(debate_rounds or [], profile)
+    elif profile == "tiny":
         stage2_summary = summarize_stage2_for_stage3(stage2_results, aggregate_rankings)
     else:
         stage2_summary = "\n\n".join(
@@ -237,7 +350,12 @@ async def stage3_synthesize_final(
         )
 
     chairman_prompt = build_stage3_prompt(
-        user_query, stage1_input, stage2_summary, profile, web_context=web_context
+        user_query,
+        stage1_input,
+        stage2_summary,
+        profile,
+        web_context=web_context,
+        deliberation_mode=mode,
     )
     messages = [{"role": "user", "content": chairman_prompt}]
     response = await _complete_with_limits(
@@ -296,6 +414,9 @@ async def run_full_council(
 ) -> Tuple[List, List, Dict, Dict]:
     settings = load_settings()
     profile = settings.council_profile or "standard"
+    mode = (settings.deliberation_mode or "rank").strip().lower()
+    if mode not in ("rank", "debate"):
+        mode = "rank"
     members = settings.get_enabled_members()
     chairman = settings.get_chairman()
 
@@ -318,10 +439,26 @@ async def run_full_council(
             "error": "all_failed",
         }, {}
 
-    stage2_results, label_to_model, ranking_parse_failed = await stage2_collect_rankings(
-        registry, members, user_query, stage1_all, profile
-    )
-    aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
+    debate_rounds_data: List[Dict[str, Any]] = []
+    stage2_results: List[Dict[str, Any]] = []
+    label_to_model: Dict[str, str] = {}
+    ranking_parse_failed = False
+    aggregate_rankings: List[Dict[str, Any]] = []
+
+    if mode == "debate":
+        debate_rounds_data, label_to_model = await stage2_run_debate_rounds(
+            registry,
+            members,
+            user_query,
+            stage1_all,
+            profile,
+            debate_rounds=settings.debate_rounds,
+        )
+    else:
+        stage2_results, label_to_model, ranking_parse_failed = await stage2_collect_rankings(
+            registry, members, user_query, stage1_all, profile
+        )
+        aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
 
     if not chairman:
         return stage1_all, stage2_results, {
@@ -333,6 +470,8 @@ async def run_full_council(
             "label_to_model": label_to_model,
             "aggregate_rankings": aggregate_rankings,
             "ranking_parse_failed": ranking_parse_failed,
+            "deliberation_mode": mode,
+            "debate_rounds": debate_rounds_data,
         }
 
     stage3_result = await stage3_synthesize_final(
@@ -343,6 +482,8 @@ async def run_full_council(
         stage2_results,
         aggregate_rankings,
         profile,
+        deliberation_mode=mode,
+        debate_rounds=debate_rounds_data,
     )
 
     metadata = {
@@ -350,11 +491,15 @@ async def run_full_council(
         "aggregate_rankings": aggregate_rankings,
         "ranking_parse_failed": ranking_parse_failed,
         "council_profile": profile,
+        "deliberation_mode": mode,
+        "debate_rounds_count": len(debate_rounds_data),
         "failed_members": [
             result.get("display_name")
             for result in all_stage1
             if not result.get("success")
         ],
     }
+    if debate_rounds_data:
+        metadata["debate_rounds"] = debate_rounds_data
 
     return stage1_all, stage2_results, stage3_result, metadata
