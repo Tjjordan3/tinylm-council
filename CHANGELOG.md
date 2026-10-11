@@ -4,10 +4,13 @@ All notable changes to TinyLM Council are documented here.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-11
+
 ### Added
 
 - **Debate deliberation mode** — Settings and per-message toggle between ranked peer review and structured multi-round debate before the chairman synthesizes a consensus
 - **`deliberation_mode` / `debate_rounds`** — persisted settings (1–3 debate rounds); chat composer can override mode per message
+- **Debate guide section** — summary in Windows setup / desktop docs for how debate rounds work
 
 ## [0.6.0] - 2026-10-11
 
@@ -104,6 +107,7 @@ All notable changes to TinyLM Council are documented here.
 - Windows launcher (`start.ps1`)
 - LM Studio council reliability improvements
 
+[0.7.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.7.0
 [0.6.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.6.0
 [0.5.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.5.0
 [0.4.1]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.4.1

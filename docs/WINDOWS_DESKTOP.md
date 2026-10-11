@@ -57,6 +57,18 @@ Same as the web app:
 
 See [WINDOWS_SETUP.md](WINDOWS_SETUP.md) for provider tips, Tailscale phone access (via the classic browser launcher), and troubleshooting.
 
+## Debate mode (summary)
+
+From **v0.7.0**, the desktop app includes **Debate** deliberation alongside ranked peer review.
+
+| Step | What happens |
+|------|----------------|
+| **1. First opinions** | Each council member answers your question. |
+| **2. Debate** | Members rebut each other for 1–3 anonymized rounds and revise their answers. |
+| **3. Final answer** | The chairman synthesizes a consensus from the initials + debate. |
+
+Enable it under **Settings → Deliberation mode → Debate**, or use the chat **Mode** dropdown for one message. Full notes: [WINDOWS_SETUP.md — Debate mode](WINDOWS_SETUP.md#debate-mode-summary).
+
 ## Develop the desktop app
 
 Requirements: Node.js 18+, Rust stable, Python 3.10+, and the usual project deps.

@@ -152,10 +152,31 @@ Both must use the **same host**. Mismatched `native_base_url` causes models to n
 
 Inference still runs on the PC (or wherever your Ollama server is configured). The phone is a remote browser.
 
+## Debate mode (summary)
+
+Use this when you want models to argue before a final consensus, instead of only ranking each other.
+
+| Step | What happens |
+|------|----------------|
+| **1. First opinions** | Every enabled member answers your question (same as ranked mode). |
+| **2. Debate rounds** | For 1–3 rounds, each member sees the others’ anonymized answers, challenges errors, concedes good points, and revises its position. |
+| **3. Chairman** | The chairman reads the initial answers plus the debate transcript and writes one consensus reply. |
+
+**How to turn it on**
+
+1. **Settings → Council profile → Deliberation mode → Debate** (set rounds 1–3), then **Save changes**, or  
+2. In the chat composer, set **Mode** to **Debate** for a single message (does not require changing Settings).
+
+**Tips**
+
+- Start with **1 round** on Tiny / small local models; use 2 on Standard or stronger models.
+- You still need at least **2 enabled members** plus a **chairman**.
+- Ranked peer review remains the default; switch back anytime in Settings or the composer Mode control.
+
 ## Using the app
 
 - **Stop button** — appears while a consultation runs; cancels the current council and clears partial results.
-- **Deliberation mode** — in Settings (or the chat Mode control): **Ranked peer review** or **Debate** (members rebut for 1–3 rounds before the chairman).
+- **Deliberation mode** — see [Debate mode (summary)](#debate-mode-summary) above; ranked peer review is the default.
 - **One at a time** — wait for a run to finish (or stop it) before sending another question.
 - **Failed models** — one bad model does not stop the council; remove unreliable models in Settings.
 - **Web search** — check **Search the web first** before sending; add your Serper key in **Settings → Web search** or in `.env` ([serper.dev](https://serper.dev), ~2,500 free searches/month). Sources show in the **Web sources** panel. Council still runs if the key is missing (with a warning).
