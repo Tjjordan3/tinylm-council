@@ -4,10 +4,14 @@ All notable changes to TinyLM Council are documented here.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-11
+
 ### Added
 
-- **Windows desktop app (Tauri)** — native WebView2 shell with FastAPI API sidecar, NSIS installer via `scripts/pack-windows.ps1` and GitHub Actions
+- **Windows desktop app (Tauri)** — native WebView2 shell with FastAPI API sidecar; install from [GitHub Releases](https://github.com/Tjjordan3/tinylm-council/releases) (`TinyLM-Council-Windows-Setup.exe`)
+- **Release assets on tag** — `v*` tags attach the NSIS installer to the GitHub Release via CI
 - **Packaged data directory** — desktop builds store settings/conversations under `%LOCALAPPDATA%\TinyLM Council\`
+- **Desktop docs** — [WINDOWS_DESKTOP.md](docs/WINDOWS_DESKTOP.md); Windows setup guide leads with the installer path
 
 ## [0.5.0] - 2026-06-10
 
@@ -95,6 +99,7 @@ All notable changes to TinyLM Council are documented here.
 - Windows launcher (`start.ps1`)
 - LM Studio council reliability improvements
 
+[0.6.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.6.0
 [0.5.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.5.0
 [0.4.1]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.4.1
 [0.4.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.4.0

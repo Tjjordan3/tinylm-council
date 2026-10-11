@@ -2,7 +2,24 @@
 
 Run TinyLM Council on your Windows PC with Ollama or LM Studio, and optionally access it from your phone over Tailscale.
 
-## Architecture
+## Choose how to run
+
+| Path | Best for | Guide |
+|------|----------|-------|
+| **Desktop installer** (recommended) | Double-click app, no Python/Node | **[WINDOWS_DESKTOP.md](WINDOWS_DESKTOP.md)** + [Releases](https://github.com/Tjjordan3/tinylm-council/releases) |
+| **Dev server** (`start.ps1`) | Contributing, Tailscale phone browser, hacking on the UI | This page (below) |
+
+### Desktop installer (easiest)
+
+1. Download **`TinyLM-Council-Windows-Setup.exe`** from **[Releases](https://github.com/Tjjordan3/tinylm-council/releases)**.
+2. Run the installer and launch **TinyLM Council** from the Start menu.
+3. Install [Ollama](https://ollama.com/) (and pull a small model) or [LM Studio](https://lmstudio.ai/), then finish the in-app wizard.
+
+Full desktop details (data folder, building from source, CI): **[WINDOWS_DESKTOP.md](WINDOWS_DESKTOP.md)**.
+
+The rest of this guide covers the **source / `start.ps1`** workflow.
+
+## Architecture (dev server)
 
 ```mermaid
 flowchart TB
@@ -33,7 +50,7 @@ flowchart TB
     TS --> VITE
 ```
 
-## Requirements
+## Requirements (dev server)
 
 - **Windows 10/11**
 - **Python 3.10+** — [python.org](https://www.python.org/downloads/) (check "Add to PATH")
@@ -41,7 +58,7 @@ flowchart TB
 - **Ollama** and/or **LM Studio** for local models
 - **Tailscale** (optional, for phone access) — [tailscale.com/download](https://tailscale.com/download)
 
-## Quick start
+## Quick start (dev server)
 
 ### 1. Clone the repo
 
@@ -191,7 +208,7 @@ npm run dev
 
 ## Data location
 
-Settings and conversations are stored in:
+**Dev server** (`start.ps1`) stores settings and conversations in:
 
 ```text
 tinylm-council/data/
@@ -200,6 +217,8 @@ tinylm-council/data/
 ```
 
 This folder is gitignored. Back it up if you reinstall or move machines.
+
+**Desktop installer** builds use `%LOCALAPPDATA%\TinyLM Council\` instead — see [WINDOWS_DESKTOP.md](WINDOWS_DESKTOP.md).
 
 ## Update
 
@@ -216,5 +235,7 @@ Then restart with `.\start.ps1`.
 
 ## See also
 
+- [Windows desktop app](WINDOWS_DESKTOP.md) — Tauri installer (`TinyLM-Council-Windows-Setup.exe`)
+- [GitHub Releases](https://github.com/Tjjordan3/tinylm-council/releases) — download Windows builds
 - [Server setup guide](SERVER_SETUP.md) — Linux production deployment with nginx
 - [Main README](../README.md)

@@ -1,6 +1,28 @@
 # TinyLM Council — Windows Desktop App (Tauri)
 
-Native Windows app shell (WebView2) with the FastAPI backend bundled as a sidecar process.
+Native Windows app shell (WebView2) with the FastAPI backend bundled as a sidecar process. Prefer this over the Python/Node `start.ps1` flow if you just want to install and run.
+
+## Download (GitHub Releases)
+
+Grab the latest Windows installer from:
+
+**[github.com/Tjjordan3/tinylm-council/releases](https://github.com/Tjjordan3/tinylm-council/releases)**
+
+| Asset | What it is |
+|-------|------------|
+| `TinyLM-Council-Windows-Setup.exe` | Latest Windows NSIS installer (stable filename) |
+| `TinyLM-Council-<version>-Windows-Setup.exe` | Same installer, versioned filename |
+
+Tagged releases (`v*`) attach these automatically via CI. Pre-release / PR builds may only appear as [Actions artifacts](https://github.com/Tjjordan3/tinylm-council/actions/workflows/windows-desktop.yml).
+
+## Install
+
+1. Download the installer from the [Releases](https://github.com/Tjjordan3/tinylm-council/releases) page.
+2. Run it (Windows may prompt for [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) — Win11 usually has it already).
+3. Launch **TinyLM Council** from the Start menu.
+4. Install [Ollama](https://ollama.com/) and/or [LM Studio](https://lmstudio.ai/) separately, then complete the in-app setup wizard.
+
+Optional secrets can go in `%LOCALAPPDATA%\TinyLM Council\.env` (same keys as [`.env.example`](../.env.example)).
 
 ## What you get
 
@@ -10,7 +32,7 @@ Native Windows app shell (WebView2) with the FastAPI backend bundled as a sideca
 | **tinylm-council-api.exe** (sidecar) | Local FastAPI server on `127.0.0.1:8001` |
 | **User data** | `%LOCALAPPDATA%\TinyLM Council\` (`settings.json`, `conversations\`, optional `.env`) |
 
-Ollama, LM Studio, and cloud providers are **not** bundled. Install and run them separately, same as the web workflow.
+Ollama, LM Studio, and cloud providers are **not** bundled. Install and run them separately.
 
 ```mermaid
 flowchart LR
@@ -25,21 +47,21 @@ flowchart LR
   API --> Data["%LOCALAPPDATA%/TinyLM Council"]
 ```
 
-## Install a release build
+## First-time configuration
 
-1. Install [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) if Windows prompts for it (Win11 usually has it).
-2. Run the NSIS installer from GitHub Actions artifacts or a release.
-3. Launch **TinyLM Council** from the Start menu.
-4. Point Settings at Ollama (`localhost:11434`) or LM Studio (`localhost:1234`) and pick models.
+Same as the web app:
 
-Optional secrets can go in `%LOCALAPPDATA%\TinyLM Council\.env` (same keys as [`.env.example`](../.env.example)).
+1. Complete the **setup wizard** (Ollama-only is fine).
+2. In **Settings**, pick **Tiny** profile, enable 2+ models, choose a chairman, save.
+3. Ask a short test question.
+
+See [WINDOWS_SETUP.md](WINDOWS_SETUP.md) for provider tips, Tailscale phone access (via the classic browser launcher), and troubleshooting.
 
 ## Develop the desktop app
 
 Requirements: Node.js 18+, Rust stable, Python 3.10+, and the usual project deps.
 
 ```powershell
-# Terminal 1 is not needed — Tauri starts the API itself in desktop mode.
 cd frontend
 npm install
 npm run desktop:dev
@@ -65,9 +87,13 @@ Installer output:
 
 `frontend\src-tauri\target\release\bundle\nsis\`
 
-## CI
+## CI and releases
 
-[`.github/workflows/windows-desktop.yml`](../.github/workflows/windows-desktop.yml) builds the NSIS installer on `windows-latest` and uploads it as an artifact.
+[`.github/workflows/windows-desktop.yml`](../.github/workflows/windows-desktop.yml):
+
+- Builds the NSIS installer on `windows-latest`
+- Uploads a workflow artifact on PRs
+- On `v*` tags, attaches `TinyLM-Council-Windows-Setup.exe` (and a versioned copy) to the GitHub Release
 
 ## Notes
 
