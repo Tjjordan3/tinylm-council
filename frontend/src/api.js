@@ -1,4 +1,15 @@
-const API_BASE = import.meta.env.VITE_API_BASE || '';
+function resolveApiBase() {
+  if (import.meta.env.VITE_API_BASE) {
+    return import.meta.env.VITE_API_BASE;
+  }
+  // Tauri webview is not same-origin with the FastAPI sidecar.
+  if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+    return 'http://127.0.0.1:8001';
+  }
+  return '';
+}
+
+const API_BASE = resolveApiBase();
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {

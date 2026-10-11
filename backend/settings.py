@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
+from .paths import app_data_dir, settings_path
 from .providers.base import AppSettings, CouncilMember, ProviderConfig
 from .providers.registry import (
     PROVIDER_PRESETS,
@@ -16,8 +17,8 @@ from .providers.registry import (
     member_from_dict,
 )
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
-SETTINGS_PATH = DATA_DIR / "settings.json"
+DATA_DIR = app_data_dir()
+SETTINGS_PATH = settings_path()
 
 
 def _default_settings() -> AppSettings:
@@ -196,6 +197,9 @@ def settings_from_dict(data: Dict[str, Any]) -> AppSettings:
 
 
 def ensure_data_dir() -> None:
+    global DATA_DIR, SETTINGS_PATH
+    DATA_DIR = app_data_dir()
+    SETTINGS_PATH = settings_path()
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     (DATA_DIR / "conversations").mkdir(parents=True, exist_ok=True)
 
