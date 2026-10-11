@@ -57,6 +57,14 @@ Same as the web app:
 
 See [WINDOWS_SETUP.md](WINDOWS_SETUP.md) for provider tips, Tailscale phone access (via the classic browser launcher), and troubleshooting.
 
+## What’s new in v0.8.0+
+
+- **Streaming answers** — Stage 1, peer review/debate, and the chairman write into the UI as tokens arrive.
+- **Quick answer** — composer **Run → Quick** skips deliberation (Stage 1 → chairman only).
+- **Max members** — limit a run to 2–4 enabled models from the composer.
+- **Regenerate chairman** — on a finished answer, re-run Stage 3 only (reuses stored Stage 1 / debate).
+- **Stop** cancels in-flight work and frees the council for the next question.
+
 ## Debate mode (summary)
 
 From **v0.7.0**, the desktop app includes **Debate** deliberation alongside ranked peer review.

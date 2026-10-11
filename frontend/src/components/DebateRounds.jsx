@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 
 export default function DebateRounds({
@@ -9,6 +9,10 @@ export default function DebateRounds({
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const [activeRound, setActiveRound] = useState(0);
   const [activeMember, setActiveMember] = useState(0);
+
+  useEffect(() => {
+    if (defaultCollapsed) setCollapsed(true);
+  }, [defaultCollapsed]);
 
   if (!rounds || rounds.length === 0) return null;
 
@@ -48,7 +52,7 @@ export default function DebateRounds({
                 }}
                 className={`rounded-lg px-3 py-1.5 text-sm ${
                   roundIndex === index
-                    ? 'bg-indigo-600 text-white'
+                    ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
                     : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
                 }`}
               >
@@ -67,7 +71,7 @@ export default function DebateRounds({
                     onClick={() => setActiveMember(index)}
                     className={`rounded-full px-3 py-1 text-xs ${
                       memberIndex === index
-                        ? 'bg-indigo-700 text-white'
+                        ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
                         : result.success === false || result.error
                           ? 'bg-red-900/40 text-red-300'
                           : 'bg-gray-800 text-gray-300 hover:bg-gray-700'

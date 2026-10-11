@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import AsyncIterator, Dict, List, Optional
 
 from .base import (
     AppSettings,
@@ -188,3 +188,47 @@ class ProviderRegistry:
             )
 
         return result
+
+    async def complete_member_stream(
+        self,
+        member: CouncilMember,
+        messages: List[dict],
+        timeout: float = 120.0,
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
+    ) -> AsyncIterator[str]:
+        """Yield text deltas; falls back to a single chunk via complete() if unsupported."""
+        provider = self.get_provider(member.provider_id)
+        if not provider:
+            raise RuntimeError(f"Provider '{member.provider_id}' not found")
+
+        load_error = await self.ensure_model_ready(member)
+        if load_error:
+            raise RuntimeError(
+                f"Could not load {member.model} in LM Studio: {load_error}"
+            )
+
+        stream_fn = getattr(provider, "complete_stream", None)
+        if stream_fn is None:
+            result = await provider.complete(
+                member.model,
+                messages,
+                timeout=timeout,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+            if result.error:
+                raise RuntimeError(result.error)
+            if result.content:
+                yield result.content
+            return
+
+        async for delta in stream_fn(
+            member.model,
+            messages,
+            timeout=timeout,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        ):
+            if delta:
+                yield delta

@@ -124,6 +124,29 @@ def update_conversation_title(conversation_id: str, title: str) -> None:
     save_conversation(conversation)
 
 
+def update_last_assistant_stage3(
+    conversation_id: str,
+    stage3: Dict[str, Any],
+    metadata_patch: Optional[Dict[str, Any]] = None,
+) -> bool:
+    """Replace Stage 3 on the most recent assistant message (regenerate chairman)."""
+    conversation = get_conversation(conversation_id)
+    if conversation is None:
+        return False
+    messages = conversation.get("messages") or []
+    for index in range(len(messages) - 1, -1, -1):
+        if messages[index].get("role") == "assistant":
+            messages[index]["stage3"] = stage3
+            if metadata_patch:
+                meta = dict(messages[index].get("metadata") or {})
+                meta.update(metadata_patch)
+                messages[index]["metadata"] = meta
+            conversation["messages"] = messages
+            save_conversation(conversation)
+            return True
+    return False
+
+
 def delete_conversation(conversation_id: str) -> bool:
     path = get_conversation_path(conversation_id)
     if not path.exists():

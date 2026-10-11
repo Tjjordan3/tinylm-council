@@ -1,20 +1,31 @@
 import ReactMarkdown from 'react-markdown';
 
-export default function Stage3({ result }) {
+export default function Stage3({ result, onRegenerate, regenerating = false, canRegenerate = false }) {
   if (!result) return null;
 
   const text = (result.response || '').trim();
-  const hasError = result.error || !text;
+  const streaming = !!result.streaming || regenerating;
+  const hasError = !streaming && (result.error || !text);
 
   return (
-    <div className="mb-4 rounded-lg border border-indigo-700/50 bg-indigo-950/20 p-4">
-      <div className="mb-2 flex items-center gap-2">
-        <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-xs font-medium text-white">
-          Final answer
-        </span>
-        <span className="text-sm text-gray-400">
-          Chairman: {result.display_name || result.model}
-        </span>
+    <div className={`final-answer mb-4 ${streaming ? 'is-revealing' : ''}`}>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="final-badge">Final answer</span>
+        {(result.display_name || result.model) && (
+          <span className="text-sm text-[var(--muted)]">
+            Chairman: {result.display_name || result.model}
+          </span>
+        )}
+        {streaming && <span className="text-xs text-[var(--accent)]">Writing…</span>}
+        {canRegenerate && !streaming && (
+          <button
+            type="button"
+            onClick={onRegenerate}
+            className="ml-auto rounded-lg border border-[var(--border)] px-3 py-1 text-xs text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+          >
+            Regenerate chairman
+          </button>
+        )}
       </div>
       {hasError ? (
         <div className="text-sm text-amber-300">
@@ -22,8 +33,8 @@ export default function Stage3({ result }) {
             'Chairman returned an empty response. Try reloading the model in LM Studio or reducing council size.'}
         </div>
       ) : (
-        <div className="markdown-body text-gray-100">
-          <ReactMarkdown>{result.response}</ReactMarkdown>
+        <div className="markdown-body final-answer-body text-[var(--text)]">
+          <ReactMarkdown>{result.response || ''}</ReactMarkdown>
         </div>
       )}
     </div>

@@ -297,7 +297,7 @@ export default function Settings({ settings: initialSettings, onSave }) {
           </div>
           <button
             onClick={handleSave}
-            className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-500 sm:w-auto"
+            className="w-full rounded-lg bg-[var(--accent)] px-4 py-2 text-sm text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)] sm:w-auto"
           >
             {saved ? 'Saved!' : 'Save changes'}
           </button>
@@ -315,7 +315,7 @@ export default function Settings({ settings: initialSettings, onSave }) {
                 onClick={() => setSettings((prev) => ({ ...prev, council_profile: profile }))}
                 className={`rounded-lg px-4 py-2 text-sm capitalize ${
                   (settings.council_profile || 'tiny') === profile
-                    ? 'bg-indigo-600 text-white'
+                    ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
                     : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
                 }`}
               >
@@ -352,7 +352,7 @@ export default function Settings({ settings: initialSettings, onSave }) {
                 }
                 className={`rounded-lg px-4 py-2 text-sm ${
                   (settings.deliberation_mode || 'rank') === mode.id
-                    ? 'bg-indigo-600 text-white'
+                    ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
                     : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
                 }`}
               >
@@ -382,6 +382,51 @@ export default function Settings({ settings: initialSettings, onSave }) {
             </label>
           )}
 
+          <h3 className="mt-6 text-base font-medium text-white">Run defaults</h3>
+          <p className="mt-1 text-sm text-gray-400">
+            Quick mode skips peer review/debate and goes Stage 1 → chairman. You can still override
+            per message in the composer.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {[
+              { id: 'full', label: 'Full council' },
+              { id: 'quick', label: 'Quick answer' },
+            ].map((mode) => (
+              <button
+                key={mode.id}
+                type="button"
+                onClick={() =>
+                  setSettings((prev) => ({ ...prev, default_run_mode: mode.id }))
+                }
+                className={`rounded-lg px-4 py-2 text-sm ${
+                  (settings.default_run_mode || 'full') === mode.id
+                    ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
+                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                }`}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+          <label className="mt-3 block text-sm text-gray-300">
+            Default max members
+            <select
+              value={settings.default_max_members ?? ''}
+              onChange={(e) =>
+                setSettings((prev) => ({
+                  ...prev,
+                  default_max_members: e.target.value ? Number(e.target.value) : null,
+                }))
+              }
+              className="mt-1 block rounded-lg border border-gray-700 bg-[#0f1117] px-3 py-2 text-gray-200"
+            >
+              <option value="">All enabled</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+            </select>
+          </label>
+
           <label className="mt-4 flex cursor-pointer items-start gap-3">
             <input
               type="checkbox"
@@ -395,10 +440,10 @@ export default function Settings({ settings: initialSettings, onSave }) {
               className="mt-1"
             />
             <span className="text-sm text-gray-300">
-              <span className="font-medium text-white">Parallel Ollama requests</span>
+              <span className="font-medium text-white">Allow more parallel local requests</span>
               <span className="mt-1 block text-gray-400">
-                Faster on remote Ollama or powerful GPUs. Turn off if models crash or run out of
-                VRAM on one machine.
+                Off: up to 2 concurrent local calls (safer on one GPU). On: up to 4. Cloud providers
+                stay unlimited.
               </span>
             </span>
           </label>
@@ -406,13 +451,33 @@ export default function Settings({ settings: initialSettings, onSave }) {
 
         <section className="mt-6 rounded-xl border border-gray-800 bg-[#12141c] p-4 md:p-6">
           <h2 className="text-lg font-medium text-white">Web search</h2>
+          <label className="mb-3 flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={!!settings.web_search_auto}
+              onChange={(e) =>
+                setSettings((prev) => ({
+                  ...prev,
+                  web_search_auto: e.target.checked,
+                }))
+              }
+              className="mt-1"
+            />
+            <span className="text-sm text-gray-300">
+              <span className="font-medium text-white">Skip search when not needed</span>
+              <span className="mt-1 block text-gray-400">
+                When the composer toggle is on, skip Serper for greetings, opinions, and pure coding
+                prompts without freshness cues.
+              </span>
+            </span>
+          </label>
           <p className="mt-1 text-sm text-gray-400">
             Optional pre-search before council runs. Uses{' '}
             <a
               href="https://serper.dev"
               target="_blank"
               rel="noreferrer"
-              className="text-indigo-400 hover:text-indigo-300"
+              className="text-[var(--accent)] hover:text-[var(--accent-hover)]"
             >
               Serper
             </a>{' '}
@@ -481,7 +546,7 @@ export default function Settings({ settings: initialSettings, onSave }) {
               href="https://build.nvidia.com/models"
               target="_blank"
               rel="noreferrer"
-              className="text-indigo-400 hover:text-indigo-300"
+              className="text-[var(--accent)] hover:text-[var(--accent-hover)]"
             >
               NVIDIA NIM
             </a>
@@ -711,7 +776,7 @@ export default function Settings({ settings: initialSettings, onSave }) {
                 <span className="text-sm text-gray-300">Add from {provider.name}</span>
                 <button
                   onClick={() => loadModels(provider.id)}
-                  className="text-left text-sm text-indigo-400 hover:text-indigo-300 sm:text-right"
+                  className="text-left text-sm text-[var(--accent)] hover:text-[var(--accent-hover)] sm:text-right"
                 >
                   Load models
                 </button>

@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 import os
 import time
-from typing import Dict, List, Optional
+from typing import AsyncIterator, Dict, List, Optional
 
 import httpx
 
+from ..http_client import get_http_client, get_streaming_client
 from .base import (
     CompletionResult,
     ConnectionTestResult,
@@ -94,6 +97,23 @@ class OpenAICompatibleProvider:
             notes="Generic OpenAI-compatible endpoint; list models only.",
         )
 
+    def _build_payload(
+        self,
+        model: str,
+        messages: List[Dict[str, str]],
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
+        stream: bool = False,
+    ) -> Dict:
+        payload: Dict = {"model": model, "messages": messages}
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
+        if temperature is not None:
+            payload["temperature"] = temperature
+        if stream:
+            payload["stream"] = True
+        return payload
+
     async def complete(
         self,
         model: str,
@@ -104,42 +124,91 @@ class OpenAICompatibleProvider:
     ) -> CompletionResult:
         if (self.config.preset or "").lower() == "nvidia" and not self.api_key:
             return CompletionResult(content="", error=self._missing_nvidia_key_message())
-        payload = {"model": model, "messages": messages}
-        if max_tokens is not None:
-            payload["max_tokens"] = max_tokens
-        if temperature is not None:
-            payload["temperature"] = temperature
+        payload = self._build_payload(model, messages, max_tokens, temperature)
         try:
-            async with httpx.AsyncClient(timeout=timeout) as client:
-                response = await client.post(
-                    f"{self.config.base_url.rstrip('/')}/chat/completions",
-                    headers=self._headers(),
-                    json=payload,
-                )
-                response.raise_for_status()
-                data = response.json()
-                message = data["choices"][0]["message"]
-                return CompletionResult(content=message.get("content") or "")
+            client = get_http_client()
+            response = await client.post(
+                f"{self.config.base_url.rstrip('/')}/chat/completions",
+                headers=self._headers(),
+                json=payload,
+                timeout=timeout,
+            )
+            response.raise_for_status()
+            data = response.json()
+            message = data["choices"][0]["message"]
+            return CompletionResult(content=message.get("content") or "")
+        except asyncio.CancelledError:
+            raise
+        except httpx.TimeoutException as exc:
+            return CompletionResult(content="", error=f"Timeout: {exc}")
         except Exception as exc:
             return CompletionResult(content="", error=str(exc))
+
+    async def complete_stream(
+        self,
+        model: str,
+        messages: List[Dict[str, str]],
+        timeout: float = 120.0,
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
+    ) -> AsyncIterator[str]:
+        """Yield text deltas from a streaming chat completion."""
+        if (self.config.preset or "").lower() == "nvidia" and not self.api_key:
+            raise RuntimeError(self._missing_nvidia_key_message())
+
+        payload = self._build_payload(
+            model, messages, max_tokens, temperature, stream=True
+        )
+        client = get_streaming_client()
+        async with client.stream(
+            "POST",
+            f"{self.config.base_url.rstrip('/')}/chat/completions",
+            headers=self._headers(),
+            json=payload,
+            timeout=timeout,
+        ) as response:
+            response.raise_for_status()
+            async for line in response.aiter_lines():
+                if not line:
+                    continue
+                if line.startswith("data: "):
+                    data_str = line[6:].strip()
+                else:
+                    data_str = line.strip()
+                if not data_str or data_str == "[DONE]":
+                    if data_str == "[DONE]":
+                        break
+                    continue
+                try:
+                    data = json.loads(data_str)
+                except json.JSONDecodeError:
+                    continue
+                choices = data.get("choices") or []
+                if not choices:
+                    continue
+                delta = choices[0].get("delta") or {}
+                content = delta.get("content")
+                if content:
+                    yield content
 
     async def list_models(self) -> List[ModelInfo]:
         if (self.config.preset or "").lower() == "nvidia" and not self.api_key:
             return []
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(
-                    f"{self.config.base_url.rstrip('/')}/models",
-                    headers=self._headers(),
-                )
-                response.raise_for_status()
-                data = response.json()
-                models = []
-                for item in data.get("data", []):
-                    model_id = item.get("id", "")
-                    if model_id:
-                        models.append(ModelInfo(id=model_id, name=model_id))
-                return sorted(models, key=lambda m: m.id)
+            client = get_http_client()
+            response = await client.get(
+                f"{self.config.base_url.rstrip('/')}/models",
+                headers=self._headers(),
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            data = response.json()
+            models = []
+            for item in data.get("data", []):
+                model_id = item.get("id", "")
+                if model_id:
+                    models.append(ModelInfo(id=model_id, name=model_id))
+            return sorted(models, key=lambda m: m.id)
         except Exception:
             return []
 
@@ -148,20 +217,22 @@ class OpenAICompatibleProvider:
             return ConnectionTestResult(ok=False, message=self._missing_nvidia_key_message())
         start = time.perf_counter()
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                response = await client.get(
-                    f"{self.config.base_url.rstrip('/')}/models",
-                    headers=self._headers(),
-                )
-                response.raise_for_status()
-                latency = (time.perf_counter() - start) * 1000
-                return ConnectionTestResult(
-                    ok=True,
-                    message=f"Connected to {self.config.name}",
-                    latency_ms=round(latency, 1),
-                )
+            client = get_http_client()
+            response = await client.get(
+                f"{self.config.base_url.rstrip('/')}/models",
+                headers=self._headers(),
+                timeout=15.0,
+            )
+            response.raise_for_status()
+            latency = (time.perf_counter() - start) * 1000
+            return ConnectionTestResult(
+                ok=True,
+                message=f"Connected to {self.config.name}",
+                latency_ms=round(latency, 1),
+            )
         except Exception as exc:
             return ConnectionTestResult(
                 ok=False,
                 message=f"Cannot reach {self.config.name} at {self.config.base_url}: {exc}",
             )
+

@@ -21,14 +21,16 @@ export default function Sidebar({
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-gray-800 bg-[#12141c] transition-transform duration-200 md:relative md:z-auto md:max-w-none md:shrink-0 md:translate-x-0 ${
+      className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-[var(--border)] bg-[var(--panel)] transition-transform duration-200 md:relative md:z-auto md:max-w-none md:shrink-0 md:translate-x-0 ${
         isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
       }`}
     >
-      <div className="flex items-start justify-between border-b border-gray-800 p-4">
+      <div className="flex items-start justify-between border-b border-[var(--border)] p-4">
         <div>
-          <h1 className="text-lg font-semibold text-white">TinyLM Council</h1>
-          <p className="mt-1 text-xs text-gray-400">Small-model LLM deliberation</p>
+          <h1 className="font-[family-name:var(--font-brand)] text-xl font-bold tracking-tight text-[var(--text)]">
+            TinyLM Council
+          </h1>
+          <p className="mt-1 text-xs text-[var(--muted)]">Small-model LLM deliberation</p>
         </div>
         <button
           type="button"
@@ -45,7 +47,7 @@ export default function Sidebar({
           to="/"
           onClick={onClose}
           className={({ isActive }) =>
-            `rounded-md px-3 py-1.5 text-sm ${isActive ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`
+            `rounded-md px-3 py-1.5 text-sm ${isActive ? 'bg-[var(--accent)] text-[var(--accent-contrast)]' : 'text-gray-300 hover:bg-gray-800'}`
           }
         >
           Chat
@@ -54,7 +56,7 @@ export default function Sidebar({
           to="/models"
           onClick={onClose}
           className={({ isActive }) =>
-            `rounded-md px-3 py-1.5 text-sm ${isActive ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`
+            `rounded-md px-3 py-1.5 text-sm ${isActive ? 'bg-[var(--accent)] text-[var(--accent-contrast)]' : 'text-gray-300 hover:bg-gray-800'}`
           }
         >
           Models
@@ -63,7 +65,7 @@ export default function Sidebar({
           to="/settings"
           onClick={onClose}
           className={({ isActive }) =>
-            `rounded-md px-3 py-1.5 text-sm ${isActive ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`
+            `rounded-md px-3 py-1.5 text-sm ${isActive ? 'bg-[var(--accent)] text-[var(--accent-contrast)]' : 'text-gray-300 hover:bg-gray-800'}`
           }
         >
           Settings
@@ -73,7 +75,7 @@ export default function Sidebar({
       <div className="p-3">
         <button
           onClick={handleNewConversation}
-          className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+          className="w-full rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)]"
         >
           + New conversation
         </button>

@@ -1,3 +1,11 @@
+import { useEffect, useState } from 'react';
+
+function formatElapsed(ms) {
+  if (ms == null || ms < 0) return null;
+  const sec = Math.floor(ms / 1000);
+  return `${sec}s`;
+}
+
 export default function StageProgress({
   loading,
   stage1Done,
@@ -5,61 +13,82 @@ export default function StageProgress({
   stage3Done,
   memberStatuses,
   deliberationMode = 'rank',
+  runMode = 'full',
+  stageStartedAt,
 }) {
   const mode = deliberationMode === 'debate' ? 'debate' : 'rank';
-  const middleLabel = mode === 'debate' ? 'Debate' : 'Peer review';
+  const quick = runMode === 'quick';
+  const middleLabel = quick ? 'Skipped' : mode === 'debate' ? 'Debate' : 'Peer review';
   const stages = [
     { key: 'stage1', label: 'First opinions', active: loading?.stage1, done: stage1Done },
     {
       key: 'stage2',
       label: middleLabel,
-      active: loading?.stage2 || loading?.debate,
-      done: stage2Done,
+      active: !quick && (loading?.stage2 || loading?.debate),
+      done: quick ? stage1Done : stage2Done,
+      skipped: quick,
     },
     { key: 'stage3', label: 'Final answer', active: loading?.stage3, done: stage3Done },
   ];
 
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const anyActive = stages.some((s) => s.active);
+    if (!anyActive) return undefined;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [loading?.stage1, loading?.stage2, loading?.debate, loading?.stage3]);
+
+  const activeKey = stages.find((s) => s.active)?.key;
+  const started =
+    activeKey === 'stage1'
+      ? stageStartedAt?.stage1
+      : activeKey === 'stage2'
+        ? stageStartedAt?.stage2
+        : activeKey === 'stage3'
+          ? stageStartedAt?.stage3
+          : null;
+  const elapsed = started ? formatElapsed(now - started) : null;
+
   return (
-    <div className="mb-4 rounded-lg border border-gray-800 bg-[#12141c] p-4">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="stage-progress mb-5">
+      <div className="stage-rail" role="list">
         {stages.map((stage, index) => (
-          <div key={stage.key} className="flex items-center gap-2">
+          <div key={stage.key} className="stage-rail-item" role="listitem">
             <div
-              className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold ${
-                stage.done
-                  ? 'bg-green-600 text-white'
-                  : stage.active
-                    ? 'bg-indigo-600 text-white animate-pulse'
-                    : 'bg-gray-700 text-gray-300'
+              className={`stage-node ${
+                stage.done ? 'is-done' : stage.active ? 'is-active' : stage.skipped ? 'is-skipped' : ''
               }`}
             >
-              {stage.done ? '✓' : index + 1}
+              {stage.done ? '✓' : stage.skipped ? '–' : index + 1}
             </div>
-            <span className={`text-sm ${stage.active ? 'text-white' : 'text-gray-400'}`}>
-              {stage.label}
-            </span>
-            {index < stages.length - 1 && <div className="mx-2 hidden h-px w-8 bg-gray-700 sm:block" />}
+            <div className="stage-meta">
+              <span className={`stage-label ${stage.active ? 'text-ink' : ''}`}>{stage.label}</span>
+              {stage.active && elapsed && <span className="stage-elapsed">{elapsed}</span>}
+            </div>
+            {index < stages.length - 1 && <div className="stage-connector" aria-hidden="true" />}
           </div>
         ))}
       </div>
 
       {memberStatuses && Object.keys(memberStatuses).length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="member-status-row mt-3">
           {Object.entries(memberStatuses).map(([id, info]) => (
             <span
               key={id}
-              className={`rounded-full px-2.5 py-1 text-xs ${
+              className={`member-dot ${
                 info.status === 'done'
-                  ? 'bg-green-900/50 text-green-300'
+                  ? 'is-done'
                   : info.status === 'failed'
-                    ? 'bg-red-900/50 text-red-300'
-                    : info.status === 'waiting'
-                      ? 'bg-gray-800 text-gray-400'
-                      : 'bg-indigo-900/50 text-indigo-300'
+                    ? 'is-failed'
+                    : info.status === 'running'
+                      ? 'is-running'
+                      : 'is-waiting'
               }`}
             >
+              <i aria-hidden="true" />
               {info.display_name || info.model}
-              {info.status === 'failed' && ' (failed)'}
+              {info.status === 'failed' ? ' (failed)' : ''}
             </span>
           ))}
         </div>

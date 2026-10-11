@@ -20,13 +20,23 @@ from .prompts import (
     get_stage_limits,
     summarize_debate_for_stage3,
 )
-from .providers.base import CouncilMember, ProviderConfig
+from .providers.base import CompletionResult, CouncilMember, ProviderConfig
 from .providers.registry import ProviderRegistry
 from .ranking_parser import parse_ranking_with_fallback
 from .settings import load_settings
+from .token_budget import (
+    build_shared_brief,
+    cache_get_stage1,
+    cache_set_stage1,
+    pack_others_brief,
+    positions_converged,
+    slice_own_answer,
+    stage1_cache_key,
+)
 
 LOCAL_PRESETS = {"ollama", "lmstudio", "localai", "vllm"}
 _provider_semaphores: Dict[str, asyncio.Semaphore] = {}
+_semaphore_limits: Dict[str, int] = {}
 
 
 def _member_label(member: CouncilMember) -> str:
@@ -39,19 +49,45 @@ def _is_local_provider(config: Optional[ProviderConfig]) -> bool:
     return (config.preset or "").lower() in LOCAL_PRESETS
 
 
-def _should_serialize_local(profile: str, config: Optional[ProviderConfig]) -> bool:
+def _local_concurrency(profile: str, config: Optional[ProviderConfig]) -> Optional[int]:
+    """Return semaphore size for local providers, or None for unlimited."""
+    if not _is_local_provider(config):
+        return None
     settings = load_settings()
     if settings.parallel_local_inference:
-        return False
+        return 4
     if profile == "tiny":
-        return _is_local_provider(config)
-    return False
+        return 2
+    return None
 
 
-def _get_provider_semaphore(provider_id: str) -> asyncio.Semaphore:
-    if provider_id not in _provider_semaphores:
-        _provider_semaphores[provider_id] = asyncio.Semaphore(1)
+def _get_provider_semaphore(provider_id: str, limit: int) -> asyncio.Semaphore:
+    current = _semaphore_limits.get(provider_id)
+    sem = _provider_semaphores.get(provider_id)
+    if sem is None:
+        _provider_semaphores[provider_id] = asyncio.Semaphore(limit)
+        _semaphore_limits[provider_id] = limit
+        return _provider_semaphores[provider_id]
+    if current != limit:
+        # Only swap when fully released to avoid briefly over-admitting holders.
+        if getattr(sem, "_value", None) == current:
+            _provider_semaphores[provider_id] = asyncio.Semaphore(limit)
+            _semaphore_limits[provider_id] = limit
     return _provider_semaphores[provider_id]
+
+
+async def _with_provider_limit(
+    profile: str,
+    provider_config: Optional[ProviderConfig],
+    provider_id: str,
+    coro_factory,
+):
+    limit = _local_concurrency(profile, provider_config)
+    if limit is None:
+        return await coro_factory()
+    semaphore = _get_provider_semaphore(provider_id, limit)
+    async with semaphore:
+        return await coro_factory()
 
 
 def calculate_aggregate_rankings(
@@ -99,11 +135,99 @@ async def _complete_with_limits(
             temperature=limits.get("temperature"),
         )
 
-    if _should_serialize_local(profile, provider_config):
-        semaphore = _get_provider_semaphore(member.provider_id)
-        async with semaphore:
-            return await run()
-    return await run()
+    return await _with_provider_limit(
+        profile, provider_config, member.provider_id, run
+    )
+
+
+async def _stream_with_limits(
+    registry: ProviderRegistry,
+    member: CouncilMember,
+    messages: List[dict],
+    stage: str,
+    profile: str,
+    timeout: float = 120.0,
+    on_delta: Optional[Callable[[str], None]] = None,
+) -> CompletionResult:
+    """Stream tokens via on_delta; return final CompletionResult."""
+    limits = get_stage_limits(profile, stage)
+    provider_config = registry.settings.get_provider(member.provider_id)
+
+    async def run() -> CompletionResult:
+        parts: List[str] = []
+        try:
+            async for delta in registry.complete_member_stream(
+                member,
+                messages,
+                timeout=timeout,
+                max_tokens=limits.get("max_tokens"),
+                temperature=limits.get("temperature"),
+            ):
+                parts.append(delta)
+                if on_delta:
+                    on_delta(delta)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            return CompletionResult(content="".join(parts), error=str(exc))
+        content = "".join(parts)
+        if not content.strip():
+            return CompletionResult(
+                content="",
+                error=f"Model {member.display_name or member.model} returned an empty response",
+            )
+        return CompletionResult(content=content)
+
+    return await _with_provider_limit(
+        profile, provider_config, member.provider_id, run
+    )
+
+
+def should_auto_skip_web_search(query: str) -> bool:
+    """Heuristic: skip Serper for greetings / opinion / pure coding without freshness cues."""
+    q = (query or "").strip().lower()
+    if not q:
+        return True
+    freshness = (
+        "latest",
+        "current",
+        "today",
+        "news",
+        "2024",
+        "2025",
+        "2026",
+        "price",
+        "who is",
+        "when did",
+        "weather",
+    )
+    if any(token in q for token in freshness):
+        return False
+    greetings = (
+        "hi",
+        "hello",
+        "hey",
+        "thanks",
+        "thank you",
+        "good morning",
+        "good evening",
+    )
+    if q in greetings or q.rstrip("!") in greetings:
+        return True
+    if q.startswith(("what do you think", "how do you feel", "opinion on")):
+        return True
+    coding_starts = (
+        "write a",
+        "implement ",
+        "refactor ",
+        "fix this",
+        "debug ",
+        "explain this code",
+        "```",
+    )
+    if any(q.startswith(s) for s in coding_starts) or "```" in q:
+        return True
+    return False
 
 
 async def stage1_collect_responses(
@@ -147,12 +271,24 @@ async def stage2_collect_rankings(
     stage1_results: List[Dict[str, Any]],
     profile: str,
     web_context: str = "",
+    on_member_complete: Optional[Callable[[Dict[str, Any]], None]] = None,
+    on_delta: Optional[Callable[[str, str], None]] = None,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, str], bool]:
-    stage1_input = stage1_results
-    if profile == "tiny":
-        stage1_input = trim_stage1_for_stage2(stage1_results, max_chars_per_response=600)
+    labels = [chr(65 + i) for i in range(len(stage1_results))]
+    brief = build_shared_brief(stage1_results, profile, labels=labels)
+    # Reconstruct trimmed stage1_input for prompt helper compatibility
+    stage1_input = trim_stage1_for_stage2(
+        stage1_results,
+        max_chars_per_response=max(80, (len(brief) // max(len(stage1_results), 1)) + 20),
+    )
+    if brief:
+        # Prefer shared brief packing over naive per-response trim
+        for idx, result in enumerate(stage1_input):
+            label = labels[idx]
+            marker = f"Response {label}"
+            # keep display fields; response already trimmed via brief allocation
+            _ = marker
 
-    labels = [chr(65 + i) for i in range(len(stage1_input))]
     available_labels = [f"Response {label}" for label in labels]
     label_to_model = {
         f"Response {label}": result.get("display_name") or result["model"]
@@ -160,11 +296,15 @@ async def stage2_collect_rankings(
     }
 
     ranking_prompt = build_stage2_prompt(
-        user_query, stage1_input, labels, profile, web_context=web_context
+        user_query,
+        stage1_input,
+        labels,
+        profile,
+        web_context=web_context,
+        shared_brief=brief,
     )
     messages = [{"role": "user", "content": ranking_prompt}]
     any_parse_failed = False
-    stage2_results = []
 
     successful_member_ids = {result.get("member_id") for result in stage1_results}
     ranking_members = [m for m in members if m.id in successful_member_ids]
@@ -173,25 +313,38 @@ async def stage2_collect_rankings(
 
     async def rank_member(member: CouncilMember) -> Optional[Dict[str, Any]]:
         nonlocal any_parse_failed
-        response = await _complete_with_limits(
-            registry, member, messages, "stage2", profile
+
+        def delta_cb(delta: str, mid: str = member.id) -> None:
+            if on_delta:
+                on_delta(mid, delta)
+
+        response = await _stream_with_limits(
+            registry,
+            member,
+            messages,
+            "stage2",
+            profile,
+            on_delta=delta_cb if on_delta else None,
         )
         if response.error:
-            return {
+            result = {
                 "member_id": member.id,
                 "model": member.model,
                 "display_name": _member_label(member),
                 "provider_id": member.provider_id,
-                "ranking": "",
+                "ranking": response.content or "",
                 "parsed_ranking": [],
                 "parse_failed": True,
                 "error": response.error,
             }
+            if on_member_complete:
+                on_member_complete(result)
+            return result
         full_text = response.content
         parsed, parse_failed = parse_ranking_with_fallback(full_text, available_labels)
         if parse_failed:
             any_parse_failed = True
-        return {
+        result = {
             "member_id": member.id,
             "model": member.model,
             "display_name": _member_label(member),
@@ -201,6 +354,9 @@ async def stage2_collect_rankings(
             "parse_failed": parse_failed,
             "error": None,
         }
+        if on_member_complete:
+            on_member_complete(result)
+        return result
 
     stage2_results = []
     for coro in asyncio.as_completed([rank_member(member) for member in ranking_members]):
@@ -219,6 +375,7 @@ async def stage2_run_debate_rounds(
     debate_rounds: int = 1,
     web_context: str = "",
     on_member_complete: Optional[Callable[[int, Dict[str, Any]], None]] = None,
+    on_delta: Optional[Callable[[int, str, str], None]] = None,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
     """Run structured anonymized debate rounds; returns (rounds, label_to_model)."""
     rounds_count = max(1, min(3, int(debate_rounds or 1)))
@@ -264,18 +421,19 @@ async def stage2_run_debate_rounds(
                 }
 
             own_label = id_to_label[member_id]
-            own_text = pos["response"]
-            if profile == "tiny":
-                own_text = truncate_text(own_text, 600)
+            own_text = slice_own_answer(pos["response"], profile)
 
             others = []
             for other_id in ordered_ids:
                 if other_id == member_id:
                     continue
-                other_text = positions[other_id]["response"]
-                if profile == "tiny":
-                    other_text = truncate_text(other_text, 600)
-                others.append({"label": id_to_label[other_id], "text": other_text})
+                others.append(
+                    {
+                        "label": id_to_label[other_id],
+                        "text": positions[other_id]["response"],
+                    }
+                )
+            others = pack_others_brief(others, profile)
 
             prompt = build_debate_round_prompt(
                 user_query,
@@ -287,8 +445,18 @@ async def stage2_run_debate_rounds(
                 web_context=web_context,
             )
             messages = [{"role": "user", "content": prompt}]
-            response = await _complete_with_limits(
-                registry, member, messages, "debate", profile
+
+            def delta_cb(delta: str, mid: str = member.id, rnd: int = current_round) -> None:
+                if on_delta:
+                    on_delta(rnd, mid, delta)
+
+            response = await _stream_with_limits(
+                registry,
+                member,
+                messages,
+                "debate",
+                profile,
+                on_delta=delta_cb if on_delta else None,
             )
             result = {
                 "member_id": member.id,
@@ -312,6 +480,16 @@ async def stage2_run_debate_rounds(
                 positions[result["member_id"]]["response"] = result["response"]
 
         debate_history.append({"round": round_number, "results": round_results})
+
+        # Early-exit when positions have converged
+        if round_number < rounds_count:
+            texts = [
+                positions[mid]["response"]
+                for mid in ordered_ids
+                if (positions[mid].get("response") or "").strip()
+            ]
+            if positions_converged(texts):
+                break
 
     return debate_history, label_to_model
 
@@ -341,6 +519,8 @@ async def stage3_synthesize_final(
     mode = (deliberation_mode or "rank").strip().lower()
     if mode == "debate":
         stage2_summary = summarize_debate_for_stage3(debate_rounds or [], profile)
+    elif mode == "quick":
+        stage2_summary = ""
     elif profile == "tiny":
         stage2_summary = summarize_stage2_for_stage3(stage2_results, aggregate_rankings)
     else:
@@ -360,6 +540,79 @@ async def stage3_synthesize_final(
     messages = [{"role": "user", "content": chairman_prompt}]
     response = await _complete_with_limits(
         registry, chairman, messages, "stage3", profile
+    )
+
+    if response.error:
+        return {
+            "member_id": chairman.id,
+            "model": chairman.model,
+            "display_name": _member_label(chairman),
+            "provider_id": chairman.provider_id,
+            "response": f"Error: Unable to generate final synthesis. {response.error}",
+            "error": response.error,
+        }
+
+    return {
+        "member_id": chairman.id,
+        "model": chairman.model,
+        "display_name": _member_label(chairman),
+        "provider_id": chairman.provider_id,
+        "response": response.content,
+    }
+
+
+async def stage3_synthesize_final_stream(
+    registry: ProviderRegistry,
+    chairman: CouncilMember,
+    user_query: str,
+    stage1_results: List[Dict[str, Any]],
+    stage2_results: List[Dict[str, Any]],
+    aggregate_rankings: List[Dict[str, Any]],
+    profile: str,
+    web_context: str = "",
+    deliberation_mode: str = "rank",
+    debate_rounds: Optional[List[Dict[str, Any]]] = None,
+    on_delta: Optional[Callable[[str], None]] = None,
+) -> Dict[str, Any]:
+    stage1_input = stage1_results
+    if profile == "tiny":
+        stage1_input = [
+            {
+                **result,
+                "response": truncate_text(result.get("response", ""), 600),
+            }
+            for result in stage1_results
+        ]
+
+    mode = (deliberation_mode or "rank").strip().lower()
+    if mode == "debate":
+        stage2_summary = summarize_debate_for_stage3(debate_rounds or [], profile)
+    elif mode == "quick":
+        stage2_summary = ""
+    elif profile == "tiny":
+        stage2_summary = summarize_stage2_for_stage3(stage2_results, aggregate_rankings)
+    else:
+        stage2_summary = "\n\n".join(
+            f"Model: {result.get('display_name') or result['model']}\nRanking: {result['ranking']}"
+            for result in stage2_results
+        )
+
+    chairman_prompt = build_stage3_prompt(
+        user_query,
+        stage1_input,
+        stage2_summary,
+        profile,
+        web_context=web_context,
+        deliberation_mode=mode,
+    )
+    messages = [{"role": "user", "content": chairman_prompt}]
+    response = await _stream_with_limits(
+        registry,
+        chairman,
+        messages,
+        "stage3",
+        profile,
+        on_delta=on_delta,
     )
 
     if response.error:

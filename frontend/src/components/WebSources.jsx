@@ -20,7 +20,7 @@ export default function WebSources({ webSearch, loading }) {
         <span className="font-medium text-gray-200">
           Web sources
           {isSearching && (
-            <span className="ml-2 text-sm font-normal text-indigo-400 animate-pulse">
+            <span className="ml-2 text-sm font-normal text-[var(--accent)] animate-pulse">
               Searching...
             </span>
           )}
@@ -50,7 +50,7 @@ export default function WebSources({ webSearch, loading }) {
                     href={source.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-medium text-indigo-400 hover:text-indigo-300"
+                    className="font-medium text-[var(--accent)] hover:text-[var(--accent-hover)]"
                   >
                     {source.title || source.url}
                   </a>

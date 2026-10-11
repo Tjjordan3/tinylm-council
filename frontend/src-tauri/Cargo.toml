@@ -1,6 +1,6 @@
 [package]
 name = "tinylm-council"
-version = "0.7.1"
+version = "0.8.0"
 description = "TinyLM Council desktop app"
 authors = ["TinyLM Council"]
 edition = "2021"

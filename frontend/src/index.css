@@ -2,18 +2,237 @@
 
 :root {
   color-scheme: dark;
+  --bg0: #0c1016;
+  --bg1: #141a24;
+  --panel: #161d29;
+  --border: #2a3344;
+  --text: #e8edf5;
+  --muted: #9aa6b8;
+  --accent: #c9853a;
+  --accent-hover: #d9954a;
+  --accent-contrast: #1a1208;
+  --accent-soft: rgba(201, 133, 58, 0.16);
+  --success: #3d9a6a;
+  --danger: #c45c5c;
+  --font-sans: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --font-brand: "IBM Plex Serif", "Georgia", serif;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background: #0f1117;
-  color: #e5e7eb;
-  font-family: Inter, system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  font-family: var(--font-sans);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(201, 133, 58, 0.08), transparent 55%),
+    linear-gradient(180deg, var(--bg1) 0%, var(--bg0) 55%, #0a0e14 100%);
+  background-attachment: fixed;
+}
+
+body::before {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  z-index: 0;
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
 }
 
 * {
   box-sizing: border-box;
+}
+
+.brand-mark {
+  font-family: var(--font-brand);
+  font-size: clamp(2.4rem, 5vw, 3.4rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  line-height: 1.1;
+}
+
+.brand-empty {
+  min-height: 50vh;
+}
+
+.stage-progress {
+  padding: 0.25rem 0;
+}
+
+.stage-rail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.5rem 0;
+}
+
+.stage-rail-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  position: relative;
+}
+
+.stage-node {
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #2a3344;
+  color: var(--muted);
+  transition: background 200ms ease, color 200ms ease, transform 200ms ease;
+}
+
+.stage-node.is-active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  transform: scale(1.05);
+}
+
+.stage-node.is-done {
+  background: var(--success);
+  color: white;
+}
+
+.stage-node.is-skipped {
+  background: #243041;
+  color: #6d7a8f;
+}
+
+.stage-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 4.5rem;
+}
+
+.stage-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.stage-label.text-ink {
+  color: var(--text);
+}
+
+.stage-elapsed {
+  font-size: 0.7rem;
+  color: var(--accent);
+}
+
+.stage-connector {
+  width: 1.75rem;
+  height: 1px;
+  background: var(--border);
+  margin: 0 0.35rem;
+}
+
+.member-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+}
+
+.member-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  animation: member-fade 280ms ease both;
+}
+
+.member-dot i {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #4b5568;
+}
+
+.member-dot.is-done {
+  color: #9fd4b5;
+}
+.member-dot.is-done i {
+  background: var(--success);
+}
+.member-dot.is-failed {
+  color: #e3a0a0;
+}
+.member-dot.is-failed i {
+  background: var(--danger);
+}
+.member-dot.is-running {
+  color: #e2c08a;
+}
+.member-dot.is-running i {
+  background: var(--accent);
+}
+
+.final-answer {
+  border-left: 3px solid var(--accent);
+  background: linear-gradient(90deg, var(--accent-soft), transparent 70%);
+  padding: 1.1rem 1.25rem 1.25rem;
+  border-radius: 0 0.75rem 0.75rem 0;
+}
+
+.final-answer.is-revealing {
+  animation: answer-reveal 420ms ease both;
+}
+
+.final-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.final-answer-body {
+  font-size: 1.05rem;
+  line-height: 1.65;
+}
+
+@keyframes member-fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes answer-reveal {
+  from {
+    opacity: 0.35;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .markdown-body p {
@@ -21,14 +240,14 @@ body {
 }
 
 .markdown-body pre {
-  background: #1a1d27;
+  background: #121821;
   padding: 0.75rem;
   border-radius: 0.5rem;
   overflow-x: auto;
 }
 
 .markdown-body code {
-  background: #1a1d27;
+  background: #121821;
   padding: 0.1rem 0.3rem;
   border-radius: 0.25rem;
 }

@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import json
 import os
-from typing import AsyncIterator, Dict, List, Optional
+from typing import AsyncIterator, Dict, List
 
-import httpx
-
+from ..http_client import get_http_client, get_streaming_client
 from .base import ModelInfo, ProgressEvent, ProviderConfig
 
 
@@ -23,15 +22,19 @@ class LMStudioNativeClient:
             headers["Authorization"] = f"Bearer {self.api_token}"
         return headers
 
-    async def _request(self, method: str, path: str, **kwargs) -> httpx.Response:
-        async with httpx.AsyncClient(timeout=kwargs.pop("timeout", 120.0)) as client:
-            response = await client.request(
-                method,
-                f"{self.base_url}{path}",
-                headers=self._headers(),
-                **kwargs,
-            )
-            return response
+    async def _request(self, method: str, path: str, **kwargs) -> "httpx.Response":
+        import httpx
+
+        timeout = kwargs.pop("timeout", 120.0)
+        client = get_http_client()
+        response = await client.request(
+            method,
+            f"{self.base_url}{path}",
+            headers=self._headers(),
+            timeout=timeout,
+            **kwargs,
+        )
+        return response
 
     async def list_installed_models(self) -> List[ModelInfo]:
         try:
@@ -61,44 +64,44 @@ class LMStudioNativeClient:
 
     async def download_model(self, model: str) -> AsyncIterator[ProgressEvent]:
         try:
-            async with httpx.AsyncClient(timeout=None) as client:
-                async with client.stream(
-                    "POST",
-                    f"{self.base_url}/api/v1/models/download",
-                    headers=self._headers(),
-                    json={"model": model},
-                ) as response:
-                    if response.status_code == 404:
-                        yield ProgressEvent(
-                            status="error",
-                            message="LM Studio native API not available. Requires LM Studio 0.4+.",
-                            error="native_api_unavailable",
-                            done=True,
-                        )
-                        return
-                    response.raise_for_status()
-                    async for line in response.aiter_lines():
-                        if not line.strip():
-                            continue
-                        try:
-                            data = json.loads(line)
-                        except json.JSONDecodeError:
-                            continue
-                        status = data.get("status", data.get("state", "downloading"))
-                        total = data.get("total") or data.get("total_bytes")
-                        completed = data.get("completed") or data.get("downloaded_bytes")
-                        percent = data.get("percent")
-                        if percent is None and total and completed is not None and total > 0:
-                            percent = round((completed / total) * 100, 1)
-                        done = status in ("success", "completed", "done")
-                        yield ProgressEvent(
-                            status=status,
-                            completed=completed,
-                            total=total,
-                            percent=percent,
-                            message=data.get("message", status),
-                            done=done,
-                        )
+            client = get_streaming_client()
+            async with client.stream(
+                "POST",
+                f"{self.base_url}/api/v1/models/download",
+                headers=self._headers(),
+                json={"model": model},
+            ) as response:
+                if response.status_code == 404:
+                    yield ProgressEvent(
+                        status="error",
+                        message="LM Studio native API not available. Requires LM Studio 0.4+.",
+                        error="native_api_unavailable",
+                        done=True,
+                    )
+                    return
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line.strip():
+                        continue
+                    try:
+                        data = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    status = data.get("status", data.get("state", "downloading"))
+                    total = data.get("total") or data.get("total_bytes")
+                    completed = data.get("completed") or data.get("downloaded_bytes")
+                    percent = data.get("percent")
+                    if percent is None and total and completed is not None and total > 0:
+                        percent = round((completed / total) * 100, 1)
+                    done = status in ("success", "completed", "done")
+                    yield ProgressEvent(
+                        status=status,
+                        completed=completed,
+                        total=total,
+                        percent=percent,
+                        message=data.get("message", status),
+                        done=done,
+                    )
         except Exception as exc:
             yield ProgressEvent(status="error", message=str(exc), error=str(exc), done=True)
 
