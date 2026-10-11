@@ -1,0 +1,61 @@
+name: Windows desktop
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "desktop/**"
+      - "scripts/**"
+      - "requirements.txt"
+      - "pyproject.toml"
+      - ".github/workflows/windows-desktop.yml"
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: frontend/src-tauri -> target
+
+      - name: Build API sidecar
+        shell: pwsh
+        run: .\scripts\build-sidecar.ps1
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build Tauri app
+        working-directory: frontend
+        run: npm run desktop:build
+
+      - name: Upload NSIS installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinylm-council-windows-nsis
+          path: frontend/src-tauri/target/release/bundle/nsis/*.exe

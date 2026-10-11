@@ -6,10 +6,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "conversations"
+from .paths import conversations_dir
+
+DATA_DIR = conversations_dir()
 
 
 def ensure_data_dir() -> None:
+    global DATA_DIR
+    DATA_DIR = conversations_dir()
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 

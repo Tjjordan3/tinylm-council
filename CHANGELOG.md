@@ -4,6 +4,11 @@ All notable changes to TinyLM Council are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **Windows desktop app (Tauri)** — native WebView2 shell with FastAPI API sidecar, NSIS installer via `scripts/pack-windows.ps1` and GitHub Actions
+- **Packaged data directory** — desktop builds store settings/conversations under `%LOCALAPPDATA%\TinyLM Council\`
+
 ## [0.5.0] - 2026-06-10
 
 ### Added

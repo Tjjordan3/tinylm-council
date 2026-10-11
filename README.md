@@ -6,7 +6,8 @@ A local web app where multiple **small LLMs** (0.5–4B) answer your question, p
 
 | Platform | Guide |
 |----------|-------|
-| **Windows** (PC + phone via Tailscale) | **[docs/WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md)** |
+| **Windows desktop app** (Tauri installer) | **[docs/WINDOWS_DESKTOP.md](docs/WINDOWS_DESKTOP.md)** |
+| **Windows** (dev server + phone via Tailscale) | **[docs/WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md)** |
 | **Linux server** (production + Tailscale) | **[docs/SERVER_SETUP.md](docs/SERVER_SETUP.md)** |
 
 See [CHANGELOG.md](CHANGELOG.md) for release notes.

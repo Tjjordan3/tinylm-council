@@ -7,7 +7,6 @@ import json
 import uuid
 from typing import Any, Dict, List, Optional
 
-from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -32,6 +31,7 @@ from .model_manager import (
     pull_model_stream,
     unload_model,
 )
+from .paths import load_env_files
 from .web_search import (
     WebSearchResult,
     is_web_search_configured,
@@ -48,13 +48,25 @@ from .settings import (
     update_settings,
 )
 
-load_dotenv()
+load_env_files()
 
 app = FastAPI(title="TinyLM Council API")
 
+_CORS_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:3000",
+    "http://tauri.localhost",
+    "https://tauri.localhost",
+    "tauri://localhost",
+    "http://localhost:1420",
+    "http://127.0.0.1:1420",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"],
+    allow_origins=_CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -508,6 +520,14 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
 
 
 if __name__ == "__main__":
+    import os
+
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    from .paths import is_desktop_mode
+
+    host = os.environ.get("TINYLM_HOST")
+    if not host:
+        host = "127.0.0.1" if is_desktop_mode() else "0.0.0.0"
+    port = int(os.environ.get("TINYLM_PORT", "8001"))
+    uvicorn.run(app, host=host, port=port)
