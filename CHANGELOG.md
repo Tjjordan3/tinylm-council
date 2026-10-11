@@ -28,6 +28,14 @@ All notable changes to TinyLM Council are documented here.
 - **Local concurrency** — Tiny profile defaults to 2 concurrent local calls; “Allow more parallel local requests” raises that to 4
 - **Desktop docs** — Quick mode, streaming, and regenerate chairman covered in Windows guides
 
+### Fixed
+
+- **Settings persistence** — `default_run_mode`, `default_max_members`, and `web_search_auto` now persist via PUT `/api/settings`
+- **Live Stage 2 / debate / Stage 3 streaming** — deltas flush immediately instead of waiting on keepalive (~12s)
+- **Empty-chat Send race** — auto-created conversations no longer wipe the optimistic streaming bubble
+- **Regenerate + web search** — persisted `context_text` is reused for Stage 3 regen and Stage 1 cache keys
+- **Max members + chairman** — forcing the chairman in no longer exceeds the member cap
+
 ## [0.7.1] - 2026-10-11
 
 ### Fixed

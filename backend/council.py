@@ -63,9 +63,16 @@ def _local_concurrency(profile: str, config: Optional[ProviderConfig]) -> Option
 
 def _get_provider_semaphore(provider_id: str, limit: int) -> asyncio.Semaphore:
     current = _semaphore_limits.get(provider_id)
-    if provider_id not in _provider_semaphores or current != limit:
+    sem = _provider_semaphores.get(provider_id)
+    if sem is None:
         _provider_semaphores[provider_id] = asyncio.Semaphore(limit)
         _semaphore_limits[provider_id] = limit
+        return _provider_semaphores[provider_id]
+    if current != limit:
+        # Only swap when fully released to avoid briefly over-admitting holders.
+        if getattr(sem, "_value", None) == current:
+            _provider_semaphores[provider_id] = asyncio.Semaphore(limit)
+            _semaphore_limits[provider_id] = limit
     return _provider_semaphores[provider_id]
 
 

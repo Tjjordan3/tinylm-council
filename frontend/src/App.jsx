@@ -17,8 +17,17 @@ export default function App() {
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const abortControllerRef = useRef(null);
+  const streamingConversationIdRef = useRef(null);
   const deltaBufferRef = useRef({});
   const deltaRafRef = useRef(null);
+
+  const clearDeltaPipeline = () => {
+    deltaBufferRef.current = {};
+    if (deltaRafRef.current != null) {
+      cancelAnimationFrame(deltaRafRef.current);
+      deltaRafRef.current = null;
+    }
+  };
 
   const flushDeltaBuffer = () => {
     if (deltaRafRef.current != null) {
@@ -193,9 +202,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (currentConversationId) {
-      loadConversation(currentConversationId);
-    }
+    if (!currentConversationId) return;
+    // Avoid wiping an in-flight optimistic stream when auto-creating a chat.
+    if (streamingConversationIdRef.current === currentConversationId) return;
+    loadConversation(currentConversationId);
   }, [currentConversationId]);
 
   const loadSettings = async () => {
@@ -227,7 +237,16 @@ export default function App() {
     }
   };
 
+  const handleSelectConversation = (id) => {
+    if (id !== currentConversationId) {
+      abortControllerRef.current?.abort();
+      streamingConversationIdRef.current = null;
+    }
+    setCurrentConversationId(id);
+  };
+
   const handleNewConversation = async () => {
+    abortControllerRef.current?.abort();
     try {
       const newConv = await api.createConversation();
       setConversations([
@@ -287,15 +306,25 @@ export default function App() {
     abortControllerRef.current?.abort();
   };
 
+  const restorePreviousStage3 = (previousStage3) => {
+    clearDeltaPipeline();
+    setCurrentConversation((prev) =>
+      updateLastAssistantMessage(prev, {
+        stage3: previousStage3,
+        loading: {
+          ...(prev.messages[prev.messages.length - 1]?.loading || {}),
+          stage3: false,
+        },
+      })
+    );
+  };
+
   const handleRegenerateChairman = async () => {
     if (!currentConversationId || isLoading || isRegenerating) return;
     setIsRegenerating(true);
     setIsLoading(true);
-    deltaBufferRef.current = {};
-    if (deltaRafRef.current != null) {
-      cancelAnimationFrame(deltaRafRef.current);
-      deltaRafRef.current = null;
-    }
+    streamingConversationIdRef.current = currentConversationId;
+    clearDeltaPipeline();
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
@@ -317,6 +346,7 @@ export default function App() {
       })
     );
 
+    let streamErrored = false;
     try {
       const result = await api.regenerateChairmanStream(
         currentConversationId,
@@ -338,6 +368,7 @@ export default function App() {
               );
               break;
             case 'error':
+              streamErrored = true;
               alert(event.message);
               break;
             default:
@@ -346,37 +377,20 @@ export default function App() {
         },
         { signal: controller.signal }
       );
-      if (result.aborted) {
-        setCurrentConversation((prev) =>
-          updateLastAssistantMessage(prev, {
-            stage3: previousStage3,
-            loading: {
-              ...(prev.messages[prev.messages.length - 1].loading || {}),
-              stage3: false,
-            },
-          })
-        );
+      if (result.aborted || streamErrored || !result.completed) {
+        restorePreviousStage3(previousStage3);
         return;
       }
-      if (result.completed) {
-        await loadConversation(currentConversationId);
-      }
+      await loadConversation(currentConversationId);
     } catch (error) {
       if (error.name !== 'AbortError') {
         console.error('Failed to regenerate chairman:', error);
         alert(error.message || 'Failed to regenerate chairman');
       }
-      setCurrentConversation((prev) =>
-        updateLastAssistantMessage(prev, {
-          stage3: previousStage3,
-          loading: {
-            ...(prev.messages[prev.messages.length - 1]?.loading || {}),
-            stage3: false,
-          },
-        })
-      );
+      restorePreviousStage3(previousStage3);
     } finally {
       abortControllerRef.current = null;
+      streamingConversationIdRef.current = null;
       setIsRegenerating(false);
       setIsLoading(false);
     }
@@ -414,6 +428,8 @@ export default function App() {
           },
           ...prev,
         ]);
+        // Mark streaming before id change so useEffect does not reload empty chat.
+        streamingConversationIdRef.current = newConv.id;
         setCurrentConversationId(newConv.id);
         setCurrentConversation(newConv);
         conversationId = newConv.id;
@@ -425,11 +441,8 @@ export default function App() {
     }
 
     setIsLoading(true);
-    deltaBufferRef.current = {};
-    if (deltaRafRef.current != null) {
-      cancelAnimationFrame(deltaRafRef.current);
-      deltaRafRef.current = null;
-    }
+    streamingConversationIdRef.current = conversationId;
+    clearDeltaPipeline();
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -829,6 +842,7 @@ export default function App() {
       }));
     } finally {
       abortControllerRef.current = null;
+      streamingConversationIdRef.current = null;
       setIsLoading(false);
     }
   };
@@ -879,7 +893,7 @@ export default function App() {
       <Sidebar
         conversations={conversations}
         currentConversationId={currentConversationId}
-        onSelectConversation={setCurrentConversationId}
+        onSelectConversation={handleSelectConversation}
         onNewConversation={handleNewConversation}
         onDeleteConversation={handleDeleteConversation}
         isOpen={sidebarOpen}

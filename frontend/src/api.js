@@ -209,6 +209,16 @@ export const api = {
           }
         }
       }
+      if (buffer.startsWith('data: ')) {
+        try {
+          const event = JSON.parse(buffer.slice(6));
+          if (event.type === 'error') errorEvents += 1;
+          if (event.type === 'complete') completed = true;
+          onEvent(event.type, event);
+        } catch {
+          /* ignore */
+        }
+      }
       return { completed, errorEvents, aborted: false };
     } catch (error) {
       if (reader) {

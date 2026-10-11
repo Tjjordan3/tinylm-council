@@ -142,5 +142,6 @@ def web_search_metadata(result: WebSearchResult, enabled: bool) -> Dict[str, Any
         "enabled": enabled,
         "query": result.query,
         "sources": result.sources,
+        "context_text": result.context_text or "",
         "error": result.error,
     }
