@@ -164,6 +164,8 @@ def settings_to_dict(settings: AppSettings, *, include_secrets: bool = False) ->
         ],
         "chairman_member_id": settings.chairman_member_id,
         "council_profile": settings.council_profile,
+        "deliberation_mode": settings.deliberation_mode,
+        "debate_rounds": settings.debate_rounds,
         "setup_complete": settings.setup_complete,
         "parallel_local_inference": settings.parallel_local_inference,
     }
@@ -184,11 +186,22 @@ def settings_from_dict(data: Dict[str, Any]) -> AppSettings:
         parallel_local_inference = bool(data["parallel_local_inference"])
     else:
         parallel_local_inference = _default_parallel_local_inference(providers)
+    mode = (data.get("deliberation_mode") or "rank").strip().lower()
+    if mode not in ("rank", "debate"):
+        mode = "rank"
+    try:
+        rounds = int(data.get("debate_rounds", 1))
+    except (TypeError, ValueError):
+        rounds = 1
+    rounds = max(1, min(3, rounds))
+
     return AppSettings(
         providers=providers,
         council_members=[member_from_dict(m) for m in data.get("council_members", [])],
         chairman_member_id=data.get("chairman_member_id"),
         council_profile=data.get("council_profile", "tiny"),
+        deliberation_mode=mode,
+        debate_rounds=rounds,
         setup_complete=data.get("setup_complete", False),
         serper_api_key=data.get("serper_api_key"),
         nvidia_api_key=data.get("nvidia_api_key"),
@@ -230,6 +243,15 @@ def update_settings(data: Dict[str, Any]) -> AppSettings:
         current.chairman_member_id = data["chairman_member_id"]
     if "council_profile" in data:
         current.council_profile = data["council_profile"]
+    if "deliberation_mode" in data:
+        mode = (data["deliberation_mode"] or "rank").strip().lower()
+        current.deliberation_mode = mode if mode in ("rank", "debate") else "rank"
+    if "debate_rounds" in data:
+        try:
+            rounds = int(data["debate_rounds"])
+        except (TypeError, ValueError):
+            rounds = current.debate_rounds
+        current.debate_rounds = max(1, min(3, rounds))
     if "setup_complete" in data:
         current.setup_complete = data["setup_complete"]
     if "serper_api_key" in data:

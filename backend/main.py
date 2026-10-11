@@ -19,6 +19,7 @@ from .council import (
     calculate_aggregate_rankings,
     generate_conversation_title,
     stage2_collect_rankings,
+    stage2_run_debate_rounds,
     stage3_synthesize_final,
 )
 from .prompts import build_stage1_messages
@@ -106,6 +107,8 @@ def refresh_registry() -> ProviderRegistry:
 class SendMessageRequest(BaseModel):
     content: str
     use_web_search: bool = False
+    deliberation_mode: Optional[str] = None
+    debate_rounds: Optional[int] = None
 
 
 class ProviderTestRequest(BaseModel):
@@ -117,6 +120,8 @@ class SettingsUpdateRequest(BaseModel):
     council_members: Optional[List[Dict[str, Any]]] = None
     chairman_member_id: Optional[str] = None
     council_profile: Optional[str] = None
+    deliberation_mode: Optional[str] = None
+    debate_rounds: Optional[int] = None
     setup_complete: Optional[bool] = None
     serper_api_key: Optional[str] = None
     nvidia_api_key: Optional[str] = None
@@ -345,6 +350,16 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
     registry = get_registry()
     settings = load_settings()
     profile = settings.council_profile or "tiny"
+    mode = (request.deliberation_mode or settings.deliberation_mode or "rank").strip().lower()
+    if mode not in ("rank", "debate"):
+        mode = "rank"
+    if request.debate_rounds is not None:
+        try:
+            rounds = max(1, min(3, int(request.debate_rounds)))
+        except (TypeError, ValueError):
+            rounds = settings.debate_rounds or 1
+    else:
+        rounds = max(1, min(3, int(settings.debate_rounds or 1)))
     members = settings.get_enabled_members()
     chairman = settings.get_chairman()
 
@@ -400,7 +415,7 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                             web_context = search_result.context_text
                             yield f"data: {json.dumps({'type': 'web_search_complete', 'data': web_search_info})}\n\n"
 
-                yield f"data: {json.dumps({'type': 'stage1_start', 'members': [{'id': m.id, 'display_name': m.display_name, 'model': m.model} for m in members]})}\n\n"
+                yield f"data: {json.dumps({'type': 'stage1_start', 'members': [{'id': m.id, 'display_name': m.display_name, 'model': m.model} for m in members], 'deliberation_mode': mode})}\n\n"
 
                 stage1_messages = build_stage1_messages(
                     request.content, profile, web_context=web_context
@@ -436,23 +451,68 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                     _rollback_user_message(conversation_id, user_saved, assistant_saved)
                     return
 
-                yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
-                async for item in _iter_with_keepalive(
-                    stage2_collect_rankings(
-                        registry,
-                        members,
-                        request.content,
-                        stage1_results,
-                        profile,
-                        web_context=web_context,
+                stage2_results: List[dict] = []
+                debate_rounds_data: List[dict] = []
+                label_to_model: Dict[str, str] = {}
+                ranking_parse_failed = False
+                aggregate_rankings: List[dict] = []
+
+                if mode == "debate":
+                    yield f"data: {json.dumps({'type': 'debate_start', 'rounds': rounds})}\n\n"
+                    pending_events: List[dict] = []
+
+                    def on_debate_member(round_number: int, result: dict) -> None:
+                        pending_events.append(
+                            {
+                                "type": "debate_member_complete",
+                                "round": round_number,
+                                "data": result,
+                            }
+                        )
+
+                    async for item in _iter_with_keepalive(
+                        stage2_run_debate_rounds(
+                            registry,
+                            members,
+                            request.content,
+                            stage1_results,
+                            profile,
+                            debate_rounds=rounds,
+                            web_context=web_context,
+                            on_member_complete=on_debate_member,
+                        )
+                    ):
+                        while pending_events:
+                            event = pending_events.pop(0)
+                            yield f"data: {json.dumps(event)}\n\n"
+                        if item is None:
+                            yield ": keepalive\n\n"
+                        else:
+                            debate_rounds_data, label_to_model = item
+                    while pending_events:
+                        event = pending_events.pop(0)
+                        yield f"data: {json.dumps(event)}\n\n"
+                    yield f"data: {json.dumps({'type': 'debate_complete', 'data': debate_rounds_data, 'metadata': {'label_to_model': label_to_model, 'deliberation_mode': 'debate', 'debate_rounds_count': len(debate_rounds_data)}})}\n\n"
+                else:
+                    yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
+                    async for item in _iter_with_keepalive(
+                        stage2_collect_rankings(
+                            registry,
+                            members,
+                            request.content,
+                            stage1_results,
+                            profile,
+                            web_context=web_context,
+                        )
+                    ):
+                        if item is None:
+                            yield ": keepalive\n\n"
+                        else:
+                            stage2_results, label_to_model, ranking_parse_failed = item
+                    aggregate_rankings = calculate_aggregate_rankings(
+                        stage2_results, label_to_model
                     )
-                ):
-                    if item is None:
-                        yield ": keepalive\n\n"
-                    else:
-                        stage2_results, label_to_model, ranking_parse_failed = item
-                aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
-                yield f"data: {json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings, 'ranking_parse_failed': ranking_parse_failed}})}\n\n"
+                    yield f"data: {json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings, 'ranking_parse_failed': ranking_parse_failed}})}\n\n"
 
                 yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
                 if not chairman:
@@ -470,6 +530,8 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                         aggregate_rankings,
                         profile,
                         web_context=web_context,
+                        deliberation_mode=mode,
+                        debate_rounds=debate_rounds_data,
                     )
                 ):
                     if item is None:
@@ -483,6 +545,8 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                     "aggregate_rankings": aggregate_rankings,
                     "ranking_parse_failed": ranking_parse_failed,
                     "council_profile": profile,
+                    "deliberation_mode": mode,
+                    "debate_rounds_count": len(debate_rounds_data),
                     "failed_members": [
                         r.get("display_name")
                         for r in all_stage1
@@ -498,7 +562,12 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                     yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
 
                 storage.add_assistant_message(
-                    conversation_id, stage1_results, stage2_results, stage3_result, metadata
+                    conversation_id,
+                    stage1_results,
+                    stage2_results,
+                    stage3_result,
+                    metadata,
+                    debate_rounds=debate_rounds_data or None,
                 )
                 assistant_saved = True
                 yield f"data: {json.dumps({'type': 'complete'})}\n\n"

@@ -1,13 +1,27 @@
-export default function StageProgress({ loading, stage1Done, stage2Done, stage3Done, memberStatuses }) {
+export default function StageProgress({
+  loading,
+  stage1Done,
+  stage2Done,
+  stage3Done,
+  memberStatuses,
+  deliberationMode = 'rank',
+}) {
+  const mode = deliberationMode === 'debate' ? 'debate' : 'rank';
+  const middleLabel = mode === 'debate' ? 'Debate' : 'Peer review';
   const stages = [
     { key: 'stage1', label: 'First opinions', active: loading?.stage1, done: stage1Done },
-    { key: 'stage2', label: 'Peer review', active: loading?.stage2, done: stage2Done },
+    {
+      key: 'stage2',
+      label: middleLabel,
+      active: loading?.stage2 || loading?.debate,
+      done: stage2Done,
+    },
     { key: 'stage3', label: 'Final answer', active: loading?.stage3, done: stage3Done },
   ];
 
   return (
     <div className="mb-4 rounded-lg border border-gray-800 bg-[#12141c] p-4">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {stages.map((stage, index) => (
           <div key={stage.key} className="flex items-center gap-2">
             <div
@@ -24,7 +38,7 @@ export default function StageProgress({ loading, stage1Done, stage2Done, stage3D
             <span className={`text-sm ${stage.active ? 'text-white' : 'text-gray-400'}`}>
               {stage.label}
             </span>
-            {index < stages.length - 1 && <div className="mx-2 h-px w-8 bg-gray-700" />}
+            {index < stages.length - 1 && <div className="mx-2 hidden h-px w-8 bg-gray-700 sm:block" />}
           </div>
         ))}
       </div>

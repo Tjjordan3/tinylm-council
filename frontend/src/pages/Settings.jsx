@@ -281,6 +281,65 @@ export default function Settings({ settings: initialSettings, onSave }) {
               </button>
             ))}
           </div>
+
+          <h3 className="mt-6 text-base font-medium text-white">Deliberation mode</h3>
+          <p className="mt-1 text-sm text-gray-400">
+            Ranked peer review anonymously scores answers. Debate lets members rebut each other
+            for a few rounds before the chairman synthesizes a consensus.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {[
+              { id: 'rank', label: 'Ranked peer review' },
+              { id: 'debate', label: 'Debate' },
+            ].map((mode) => (
+              <button
+                key={mode.id}
+                type="button"
+                onClick={() =>
+                  setSettings((prev) => {
+                    const next = { ...prev, deliberation_mode: mode.id };
+                    if (
+                      mode.id === 'debate' &&
+                      (prev.debate_rounds == null || prev.debate_rounds < 1)
+                    ) {
+                      next.debate_rounds =
+                        (prev.council_profile || 'tiny') === 'standard' ? 2 : 1;
+                    }
+                    return next;
+                  })
+                }
+                className={`rounded-lg px-4 py-2 text-sm ${
+                  (settings.deliberation_mode || 'rank') === mode.id
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                }`}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+          {(settings.deliberation_mode || 'rank') === 'debate' && (
+            <label className="mt-3 block text-sm text-gray-300">
+              Debate rounds
+              <select
+                value={settings.debate_rounds || 1}
+                onChange={(e) =>
+                  setSettings((prev) => ({
+                    ...prev,
+                    debate_rounds: Number(e.target.value),
+                  }))
+                }
+                className="mt-1 block rounded-lg border border-gray-700 bg-[#0f1117] px-3 py-2 text-gray-200"
+              >
+                {[1, 2, 3].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
           <label className="mt-4 flex cursor-pointer items-start gap-3">
             <input
               type="checkbox"
