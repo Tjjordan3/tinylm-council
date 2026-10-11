@@ -61,11 +61,15 @@ def build_stage2_prompt(
     labels: List[str],
     profile: str,
     web_context: str = "",
+    shared_brief: str = "",
 ) -> str:
-    responses_text = "\n\n".join(
-        f"Response {label}:\n{result['response']}"
-        for label, result in zip(labels, stage1_results)
-    )
+    if shared_brief and shared_brief.strip():
+        responses_text = shared_brief.strip()
+    else:
+        responses_text = "\n\n".join(
+            f"Response {label}:\n{result['response']}"
+            for label, result in zip(labels, stage1_results)
+        )
     label_list = ", ".join(f"Response {label}" for label in labels)
     example_rank = ",".join(reversed(labels)) if labels else "A,B"
     web_block = format_web_context_block(web_context)
@@ -194,6 +198,26 @@ def build_stage3_prompt(
     )
     web_block = format_web_context_block(web_context)
     mode = (deliberation_mode or "rank").strip().lower()
+
+    if mode == "quick":
+        if profile == "tiny":
+            return f"""You are the Chairman. Combine the best parts of these answers into one clear reply.
+
+Question: {user_query}
+
+{web_block}Answers:
+{stage1_text}
+
+Write one helpful final answer:"""
+
+        return f"""You are the Chairman of an LLM Council. Multiple AI models provided responses to a user's question. Synthesize them into one final answer (no peer review was run).
+
+Original Question: {user_query}
+
+{web_block}STAGE 1 - Individual Responses:
+{stage1_text}
+
+Provide a clear, well-reasoned final answer that represents the council's collective wisdom:"""
 
     if mode == "debate":
         if profile == "tiny":

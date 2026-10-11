@@ -1,14 +1,20 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 
 export default function Stage1({ responses, allResults, defaultCollapsed = false }) {
   const [activeTab, setActiveTab] = useState(0);
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
+  useEffect(() => {
+    if (defaultCollapsed) setCollapsed(true);
+  }, [defaultCollapsed]);
+
   const displayResponses =
     responses?.length > 0
       ? responses
-      : (allResults || []).filter((result) => result.success);
+      : (allResults || []).filter(
+          (result) => result.success !== false && (result.response || result.streaming)
+        );
 
   if (displayResponses.length === 0) return null;
 
@@ -41,7 +47,7 @@ export default function Stage1({ responses, allResults, defaultCollapsed = false
                 onClick={() => setActiveTab(index)}
                 className={`rounded-md px-3 py-1.5 text-sm ${
                   activeTab === index
-                    ? 'bg-indigo-600 text-white'
+                    ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
                     : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
                 }`}
               >

@@ -98,7 +98,7 @@ export default function SetupWizard({ initialSettings, onComplete }) {
               key={label}
               className={`rounded-full px-3 py-1 text-xs ${
                 index === step
-                  ? 'bg-indigo-600 text-white'
+                  ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
                   : index < step
                     ? 'bg-green-900/40 text-green-300'
                     : 'bg-gray-800 text-gray-400'
@@ -150,7 +150,7 @@ export default function SetupWizard({ initialSettings, onComplete }) {
               <button
                 onClick={testAllProviders}
                 disabled={testing}
-                className="mt-4 rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-500 disabled:opacity-50"
+                className="mt-4 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)] disabled:opacity-50"
               >
                 {testing ? 'Testing...' : 'Test all connections'}
               </button>
@@ -190,7 +190,7 @@ export default function SetupWizard({ initialSettings, onComplete }) {
                     <span className="font-medium text-white">{provider.name}</span>
                     <button
                       onClick={() => loadModelsForProvider(provider.id)}
-                      className="text-sm text-indigo-400 hover:text-indigo-300"
+                      className="text-sm text-[var(--accent)] hover:text-[var(--accent-hover)]"
                     >
                       Refresh models
                     </button>
@@ -206,7 +206,7 @@ export default function SetupWizard({ initialSettings, onComplete }) {
                           onClick={() => toggleMember(provider.id, model.id, model.name)}
                           className={`rounded-full px-3 py-1 text-xs ${
                             selected
-                              ? 'bg-indigo-600 text-white'
+                              ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
                               : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
                           }`}
                         >
@@ -252,7 +252,7 @@ export default function SetupWizard({ initialSettings, onComplete }) {
                       <div className="text-xs text-gray-500">{member.model}</div>
                     </div>
                     {settings.chairman_member_id === member.id && (
-                      <span className="text-sm text-indigo-400">Chairman</span>
+                      <span className="text-sm text-[var(--accent)]">Chairman</span>
                     )}
                   </button>
                 ))}
@@ -273,7 +273,7 @@ export default function SetupWizard({ initialSettings, onComplete }) {
             <button
               onClick={() => setStep((s) => s + 1)}
               disabled={step === 0 && settings.providers.length === 0}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-500 disabled:opacity-50"
+              className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)] disabled:opacity-50"
             >
               Next
             </button>

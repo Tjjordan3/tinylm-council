@@ -100,6 +100,9 @@ class AppSettings:
     serper_api_key: Optional[str] = None
     nvidia_api_key: Optional[str] = None
     parallel_local_inference: bool = False
+    default_run_mode: str = "full"
+    default_max_members: Optional[int] = None
+    web_search_auto: bool = False
 
     def get_enabled_members(self) -> List[CouncilMember]:
         return [m for m in self.council_members if m.enabled]

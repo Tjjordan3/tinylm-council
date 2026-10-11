@@ -16,6 +16,139 @@ export default function App() {
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const abortControllerRef = useRef(null);
+  const deltaBufferRef = useRef({});
+  const deltaRafRef = useRef(null);
+
+  const flushDeltaBuffer = () => {
+    if (deltaRafRef.current != null) {
+      cancelAnimationFrame(deltaRafRef.current);
+      deltaRafRef.current = null;
+    }
+    const buffer = deltaBufferRef.current;
+    deltaBufferRef.current = {};
+    const stage1Deltas = buffer.stage1 || {};
+    const debateDeltas = buffer.debate || {};
+    const stage3Delta = buffer.stage3 || '';
+    if (
+      !Object.keys(stage1Deltas).length &&
+      !Object.keys(debateDeltas).length &&
+      !stage3Delta
+    ) {
+      return;
+    }
+    setCurrentConversation((prev) => {
+      if (!prev?.messages?.length) return prev;
+      const lastMsg = prev.messages[prev.messages.length - 1];
+      if (lastMsg.role !== 'assistant') return prev;
+
+      let allStage1 = lastMsg.allStage1 || [];
+      let stage1 = lastMsg.stage1;
+      let debateRounds = lastMsg.debateRounds;
+      let stage3 = lastMsg.stage3;
+      let memberStatuses = { ...(lastMsg.memberStatuses || {}) };
+
+      for (const [memberId, delta] of Object.entries(stage1Deltas)) {
+        const idx = allStage1.findIndex((r) => r.member_id === memberId);
+        if (idx >= 0) {
+          const next = { ...allStage1[idx], response: (allStage1[idx].response || '') + delta };
+          allStage1 = allStage1.slice();
+          allStage1[idx] = next;
+        } else {
+          const meta = memberStatuses[memberId] || {};
+          allStage1 = [
+            ...allStage1,
+            {
+              member_id: memberId,
+              display_name: meta.display_name,
+              model: meta.model,
+              response: delta,
+              success: true,
+              streaming: true,
+            },
+          ];
+        }
+        memberStatuses[memberId] = {
+          ...(memberStatuses[memberId] || {}),
+          status: 'running',
+        };
+        stage1 = allStage1.filter((r) => r.success !== false && (r.response || r.streaming));
+      }
+
+      for (const key of Object.keys(debateDeltas)) {
+        const [roundStr, memberId] = key.split('::');
+        const roundNum = Number(roundStr);
+        const delta = debateDeltas[key];
+        const existing = [...(debateRounds || [])];
+        let roundEntry = existing.find((r) => r.round === roundNum);
+        if (!roundEntry) {
+          roundEntry = { round: roundNum, results: [] };
+          existing.push(roundEntry);
+          existing.sort((a, b) => a.round - b.round);
+        }
+        const results = [...(roundEntry.results || [])];
+        const idx = results.findIndex((r) => r.member_id === memberId);
+        if (idx >= 0) {
+          results[idx] = {
+            ...results[idx],
+            response: (results[idx].response || '') + delta,
+            streaming: true,
+          };
+        } else {
+          const meta = memberStatuses[memberId] || {};
+          results.push({
+            member_id: memberId,
+            display_name: meta.display_name,
+            model: meta.model,
+            response: delta,
+            success: true,
+            streaming: true,
+          });
+        }
+        roundEntry = { ...roundEntry, results };
+        debateRounds = existing.map((r) => (r.round === roundNum ? roundEntry : r));
+        memberStatuses[memberId] = {
+          ...(memberStatuses[memberId] || {}),
+          status: 'running',
+        };
+      }
+
+      if (stage3Delta) {
+        stage3 = {
+          ...(stage3 || {}),
+          response: ((stage3 && stage3.response) || '') + stage3Delta,
+          streaming: true,
+        };
+      }
+
+      return updateLastAssistantMessage(prev, {
+        allStage1,
+        stage1,
+        debateRounds,
+        stage3,
+        memberStatuses,
+      });
+    });
+  };
+
+  const queueDelta = (kind, payload) => {
+    if (kind === 'stage1') {
+      const { memberId, delta } = payload;
+      deltaBufferRef.current.stage1 = deltaBufferRef.current.stage1 || {};
+      deltaBufferRef.current.stage1[memberId] =
+        (deltaBufferRef.current.stage1[memberId] || '') + delta;
+    } else if (kind === 'debate') {
+      const { round, memberId, delta } = payload;
+      const key = `${round}::${memberId}`;
+      deltaBufferRef.current.debate = deltaBufferRef.current.debate || {};
+      deltaBufferRef.current.debate[key] =
+        (deltaBufferRef.current.debate[key] || '') + delta;
+    } else if (kind === 'stage3') {
+      deltaBufferRef.current.stage3 = (deltaBufferRef.current.stage3 || '') + payload.delta;
+    }
+    if (deltaRafRef.current == null) {
+      deltaRafRef.current = requestAnimationFrame(flushDeltaBuffer);
+    }
+  };
 
   useEffect(() => {
     loadSettings();
@@ -127,9 +260,22 @@ export default function App() {
       typeof options === 'object' && options.debateRounds != null
         ? options.debateRounds
         : settings?.debate_rounds;
+    const runMode =
+      typeof options === 'object' && options.runMode
+        ? options.runMode
+        : settings?.default_run_mode || 'full';
+    const maxMembers =
+      typeof options === 'object' && options.maxMembers != null
+        ? options.maxMembers
+        : settings?.default_max_members;
 
     if (!currentConversationId) return;
     setIsLoading(true);
+    deltaBufferRef.current = {};
+    if (deltaRafRef.current != null) {
+      cancelAnimationFrame(deltaRafRef.current);
+      deltaRafRef.current = null;
+    }
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -223,18 +369,29 @@ export default function App() {
                   stage3: false,
                 },
                 memberStatuses,
+                allStage1: [],
+                stage1: [],
+                stageStartedAt: { stage1: Date.now() },
                 metadata: {
                   ...(prev.messages[prev.messages.length - 1].metadata || {}),
                   deliberation_mode: event.deliberation_mode || deliberationMode,
+                  run_mode: event.run_mode || runMode,
                 },
               });
             });
             break;
+          case 'member_delta':
+            queueDelta('stage1', { memberId: event.member_id, delta: event.delta || '' });
+            break;
           case 'member_complete': {
+            flushDeltaBuffer();
             const data = event.data;
             setCurrentConversation((prev) => {
               const lastMsg = prev.messages[prev.messages.length - 1];
-              const allStage1 = upsertStage1Result(lastMsg.allStage1, data);
+              const allStage1 = upsertStage1Result(lastMsg.allStage1, {
+                ...data,
+                streaming: false,
+              });
               const stage1 = allStage1.filter((r) => r.success);
               return updateLastAssistantMessage(prev, {
                 memberStatuses: {
@@ -270,6 +427,26 @@ export default function App() {
                   ...(prev.messages[prev.messages.length - 1].loading || {}),
                   stage2: true,
                 },
+                stageStartedAt: {
+                  ...(prev.messages[prev.messages.length - 1].stageStartedAt || {}),
+                  stage2: Date.now(),
+                },
+              })
+            );
+            break;
+          case 'stage2_skipped':
+            setCurrentConversation((prev) =>
+              updateLastAssistantMessage(prev, {
+                metadata: {
+                  ...(prev.messages[prev.messages.length - 1].metadata || {}),
+                  run_mode: 'quick',
+                  stage2_skipped: true,
+                },
+                loading: {
+                  ...(prev.messages[prev.messages.length - 1].loading || {}),
+                  stage2: false,
+                  debate: false,
+                },
               })
             );
             break;
@@ -302,10 +479,22 @@ export default function App() {
                   ...(prev.messages[prev.messages.length - 1].metadata || {}),
                   deliberation_mode: 'debate',
                 },
+                stageStartedAt: {
+                  ...(prev.messages[prev.messages.length - 1].stageStartedAt || {}),
+                  stage2: Date.now(),
+                },
               })
             );
             break;
+          case 'debate_member_delta':
+            queueDelta('debate', {
+              round: event.round,
+              memberId: event.member_id,
+              delta: event.delta || '',
+            });
+            break;
           case 'debate_member_complete': {
+            flushDeltaBuffer();
             const data = event.data;
             const roundNum = event.round;
             setCurrentConversation((prev) => {
@@ -360,17 +549,29 @@ export default function App() {
           case 'stage3_start':
             setCurrentConversation((prev) =>
               updateLastAssistantMessage(prev, {
+                stage3: {
+                  response: '',
+                  streaming: true,
+                },
                 loading: {
                   ...(prev.messages[prev.messages.length - 1].loading || {}),
                   stage3: true,
                 },
+                stageStartedAt: {
+                  ...(prev.messages[prev.messages.length - 1].stageStartedAt || {}),
+                  stage3: Date.now(),
+                },
               })
             );
             break;
+          case 'stage3_delta':
+            queueDelta('stage3', { delta: event.delta || '' });
+            break;
           case 'stage3_complete':
+            flushDeltaBuffer();
             setCurrentConversation((prev) =>
               updateLastAssistantMessage(prev, {
-                stage3: event.data,
+                stage3: { ...event.data, streaming: false },
                 loading: {
                   ...(prev.messages[prev.messages.length - 1].loading || {}),
                   stage3: false,
@@ -399,6 +600,8 @@ export default function App() {
           useWebSearch,
           deliberationMode,
           debateRounds,
+          runMode,
+          maxMembers,
         }
       );
 

@@ -6,23 +6,13 @@ import os
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
-import httpx
-
 from .context_utils import truncate_text
+from .http_client import get_http_client
 
 MAX_RESULTS = 5
 MAX_RESULTS_TINY = 3
 SEARCH_TIMEOUT = 15.0
 CONTEXT_LIMITS = {"tiny": 1000, "standard": 4000}
-
-_http_client: Optional[httpx.AsyncClient] = None
-
-
-def _get_http_client() -> httpx.AsyncClient:
-    global _http_client
-    if _http_client is None:
-        _http_client = httpx.AsyncClient(timeout=SEARCH_TIMEOUT)
-    return _http_client
 
 
 def _max_results_for_profile(profile: str) -> int:
@@ -86,7 +76,7 @@ async def _serper_search(query: str, profile: str) -> WebSearchResult:
 
     num_results = _max_results_for_profile(profile)
     try:
-        client = _get_http_client()
+        client = get_http_client()
         response = await client.post(
             "https://google.serper.dev/search",
             headers={
@@ -94,6 +84,7 @@ async def _serper_search(query: str, profile: str) -> WebSearchResult:
                 "Content-Type": "application/json",
             },
             json={"q": query, "num": num_results},
+            timeout=SEARCH_TIMEOUT,
         )
         response.raise_for_status()
         data = response.json()

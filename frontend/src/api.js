@@ -94,7 +94,14 @@ export const api = {
     conversationId,
     content,
     onEvent,
-    { signal, useWebSearch = false, deliberationMode, debateRounds } = {}
+    {
+      signal,
+      useWebSearch = false,
+      deliberationMode,
+      debateRounds,
+      runMode,
+      maxMembers,
+    } = {}
   ) {
     let reader;
     try {
@@ -104,6 +111,8 @@ export const api = {
         deliberation_mode: deliberationMode || 'rank',
       };
       if (debateRounds != null) body.debate_rounds = debateRounds;
+      if (runMode) body.run_mode = runMode;
+      if (maxMembers != null) body.max_members = maxMembers;
       const response = await fetch(
         `${API_BASE}/api/conversations/${conversationId}/message/stream`,
         {

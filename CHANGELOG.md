@@ -4,6 +4,26 @@ All notable changes to TinyLM Council are documented here.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-11
+
+### Added
+
+- **Token streaming** — Stage 1, debate, and chairman answers stream into the UI as tokens arrive (`member_delta`, `debate_member_delta`, `stage3_delta`)
+- **Quick answer mode** — Stage 1 → chairman only (skip rank/debate); Settings default + per-message composer override
+- **Max members** — limit a run to 2–4 enabled members from the composer or Settings
+- **Debate early-exit** — stop further rounds when positions converge
+- **Shared Stage-2 brief + approx token budgets** — pack peer context more efficiently for tiny models
+- **Stage 1 response cache** — short in-memory TTL reuse for identical member/query retries
+- **Web search auto-skip** — optional heuristic to skip Serper on greetings/opinions/coding without freshness cues
+- **Stage elapsed timers** and timeline-style progress chrome
+- **Visual refresh** — amber/copper accent, IBM Plex typography, slate gradient atmosphere, final-answer-first layout
+
+### Changed
+
+- **Shared httpx clients** — connection reuse across provider and search calls
+- **Stop / cancel** — SSE disconnect cancels in-flight council tasks and releases the council lock
+- **Local concurrency** — Tiny profile defaults to 2 concurrent local calls; “Allow more parallel local requests” raises that to 4
+
 ## [0.7.1] - 2026-10-11
 
 ### Fixed
@@ -114,6 +134,7 @@ All notable changes to TinyLM Council are documented here.
 - Windows launcher (`start.ps1`)
 - LM Studio council reliability improvements
 
+[0.8.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.8.0
 [0.7.1]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.7.1
 [0.7.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.7.0
 [0.6.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.6.0

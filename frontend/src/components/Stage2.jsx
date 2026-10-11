@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 
 function deAnonymizeText(text, labelToModel) {
@@ -19,6 +19,10 @@ export default function Stage2({
 }) {
   const [activeTab, setActiveTab] = useState(0);
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
+
+  useEffect(() => {
+    if (defaultCollapsed) setCollapsed(true);
+  }, [defaultCollapsed]);
 
   if (!rankings || rankings.length === 0) return null;
 
@@ -85,7 +89,7 @@ export default function Stage2({
                 onClick={() => setActiveTab(index)}
                 className={`rounded-md px-3 py-1.5 text-sm ${
                   activeTab === index
-                    ? 'bg-indigo-600 text-white'
+                    ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
                     : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
                 }`}
               >

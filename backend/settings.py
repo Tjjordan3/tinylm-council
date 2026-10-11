@@ -168,6 +168,9 @@ def settings_to_dict(settings: AppSettings, *, include_secrets: bool = False) ->
         "debate_rounds": settings.debate_rounds,
         "setup_complete": settings.setup_complete,
         "parallel_local_inference": settings.parallel_local_inference,
+        "default_run_mode": settings.default_run_mode,
+        "default_max_members": settings.default_max_members,
+        "web_search_auto": settings.web_search_auto,
     }
     if include_secrets:
         result["serper_api_key"] = settings.serper_api_key
@@ -194,6 +197,17 @@ def settings_from_dict(data: Dict[str, Any]) -> AppSettings:
     except (TypeError, ValueError):
         rounds = 1
     rounds = max(1, min(3, rounds))
+    run_mode = (data.get("default_run_mode") or "full").strip().lower()
+    if run_mode not in ("full", "quick"):
+        run_mode = "full"
+    max_members = data.get("default_max_members")
+    if max_members is not None:
+        try:
+            max_members = int(max_members)
+            if max_members < 2:
+                max_members = None
+        except (TypeError, ValueError):
+            max_members = None
 
     return AppSettings(
         providers=providers,
@@ -206,6 +220,9 @@ def settings_from_dict(data: Dict[str, Any]) -> AppSettings:
         serper_api_key=data.get("serper_api_key"),
         nvidia_api_key=data.get("nvidia_api_key"),
         parallel_local_inference=parallel_local_inference,
+        default_run_mode=run_mode,
+        default_max_members=max_members,
+        web_search_auto=bool(data.get("web_search_auto", False)),
     )
 
 
@@ -262,6 +279,21 @@ def update_settings(data: Dict[str, Any]) -> AppSettings:
         current.nvidia_api_key = key.strip() if key and key.strip() else None
     if "parallel_local_inference" in data:
         current.parallel_local_inference = bool(data["parallel_local_inference"])
+    if "default_run_mode" in data:
+        run_mode = (data["default_run_mode"] or "full").strip().lower()
+        current.default_run_mode = run_mode if run_mode in ("full", "quick") else "full"
+    if "default_max_members" in data:
+        max_members = data["default_max_members"]
+        if max_members is None or max_members == "":
+            current.default_max_members = None
+        else:
+            try:
+                value = int(max_members)
+                current.default_max_members = value if value >= 2 else None
+            except (TypeError, ValueError):
+                pass
+    if "web_search_auto" in data:
+        current.web_search_auto = bool(data["web_search_auto"])
     save_settings(current)
     return current
 

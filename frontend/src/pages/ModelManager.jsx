@@ -155,7 +155,7 @@ export default function ModelManager({ settings, onMemberAdded }) {
         onClick={() => setSelectedProviderId(provider.id)}
         className={`rounded-lg px-4 py-2 text-sm ${
           selectedProviderId === provider.id
-            ? 'bg-indigo-600 text-white'
+            ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
             : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
         }`}
       >
@@ -219,7 +219,7 @@ export default function ModelManager({ settings, onMemberAdded }) {
                     type="button"
                     onClick={() => handlePull()}
                     disabled={pulling || !modelName.trim()}
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-500 disabled:opacity-50"
+                    className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)] disabled:opacity-50"
                   >
                     {pulling ? 'Downloading...' : 'Download'}
                   </button>
@@ -290,7 +290,7 @@ export default function ModelManager({ settings, onMemberAdded }) {
                 <button
                   type="button"
                   onClick={refreshAll}
-                  className="text-left text-sm text-indigo-400 hover:text-indigo-300 sm:text-right"
+                  className="text-left text-sm text-[var(--accent)] hover:text-[var(--accent-hover)] sm:text-right"
                 >
                   Refresh
                 </button>

@@ -13,7 +13,7 @@ Get the Windows desktop installer from GitHub Releases:
 | `TinyLM-Council-Windows-Setup.exe` | Windows 10/11 (NSIS installer) |
 | `TinyLM-Council-<version>-Windows-Setup.exe` | Same build, versioned filename |
 
-**Latest with Debate mode:** `v0.7.1` — download `TinyLM-Council-Windows-Setup.exe` or `TinyLM-Council-0.7.1-Windows-Setup.exe`.
+**Latest:** `v0.8.0` — streaming answers, Quick mode, and a refreshed UI. Download `TinyLM-Council-Windows-Setup.exe` or `TinyLM-Council-0.8.0-Windows-Setup.exe`.
 
 Install Ollama or LM Studio separately, then launch **TinyLM Council** from the Start menu. Details: **[docs/WINDOWS_DESKTOP.md](docs/WINDOWS_DESKTOP.md)**. Debate walkthrough: **[docs/WINDOWS_SETUP.md#debate-mode-summary](docs/WINDOWS_SETUP.md#debate-mode-summary)**.
 
@@ -30,10 +30,10 @@ Release notes: [CHANGELOG.md](CHANGELOG.md).
 ## How it works
 
 1. **Stage 1 — First opinions:** Your question goes to all council members in parallel.
-2. **Stage 2 — Deliberation** (choose in Settings or per message):
+2. **Stage 2 — Deliberation** (choose in Settings or per message), or **Quick mode** to skip this stage:
    - **Ranked peer review** (default): each member anonymously ranks the others' answers.
-   - **Debate:** members rebut each other for 1–3 rounds, then revise their positions.
-3. **Stage 3 — Final answer:** The chairman compiles everything into one consensus response.
+   - **Debate:** members rebut each other for 1–3 rounds (early-exit if they converge), then revise their positions.
+3. **Stage 3 — Final answer:** The chairman compiles everything into one consensus response (streams live in the UI).
 
 ## Tiny vs Standard profile
 

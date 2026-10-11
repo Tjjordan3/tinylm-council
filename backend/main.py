@@ -5,7 +5,8 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
-from typing import Any, Dict, List, Optional
+from contextlib import asynccontextmanager
+from typing import Any, Dict, List, Optional, Set
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,14 +15,16 @@ from pydantic import BaseModel
 
 from . import storage
 from .council import (
-    _complete_with_limits,
     _member_label,
+    _stream_with_limits,
     calculate_aggregate_rankings,
     generate_conversation_title,
+    should_auto_skip_web_search,
     stage2_collect_rankings,
     stage2_run_debate_rounds,
-    stage3_synthesize_final,
+    stage3_synthesize_final_stream,
 )
+from .http_client import close_http_clients
 from .prompts import build_stage1_messages
 from .model_manager import (
     delete_model,
@@ -33,6 +36,7 @@ from .model_manager import (
     unload_model,
 )
 from .paths import load_env_files
+from .token_budget import cache_get_stage1, cache_set_stage1, stage1_cache_key
 from .web_search import (
     WebSearchResult,
     is_web_search_configured,
@@ -51,7 +55,14 @@ from .settings import (
 
 load_env_files()
 
-app = FastAPI(title="TinyLM Council API")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    yield
+    await close_http_clients()
+
+
+app = FastAPI(title="TinyLM Council API", lifespan=lifespan)
 
 _CORS_ORIGINS = [
     "http://localhost:5173",
@@ -65,8 +76,8 @@ _CORS_ORIGINS = [
     "http://127.0.0.1:1420",
 ]
 
-APP_VERSION = "0.7.1"
-APP_FEATURES = ["debate"]
+APP_VERSION = "0.8.0"
+APP_FEATURES = ["debate", "streaming", "quick_mode"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -85,11 +96,26 @@ KEEPALIVE_INTERVAL = 12.0
 async def _iter_with_keepalive(awaitable, interval: float = KEEPALIVE_INTERVAL):
     """Yield None for keepalive ticks while waiting on a long council step."""
     task = asyncio.create_task(awaitable)
-    while not task.done():
-        done, _ = await asyncio.wait({task}, timeout=interval)
-        if not done:
-            yield None
-    yield await task
+    try:
+        while not task.done():
+            done, _ = await asyncio.wait({task}, timeout=interval)
+            if not done:
+                yield None
+        yield await task
+    except (asyncio.CancelledError, GeneratorExit):
+        if not task.done():
+            task.cancel()
+            try:
+                await task
+            except Exception:
+                pass
+        raise
+
+
+def _cancel_tasks(tasks: Set[asyncio.Task]) -> None:
+    for task in list(tasks):
+        if task and not task.done():
+            task.cancel()
 
 
 def _rollback_user_message(conversation_id: str, user_saved: bool, assistant_saved: bool) -> None:
@@ -112,6 +138,8 @@ class SendMessageRequest(BaseModel):
     use_web_search: bool = False
     deliberation_mode: Optional[str] = None
     debate_rounds: Optional[int] = None
+    run_mode: Optional[str] = None
+    max_members: Optional[int] = None
 
 
 class ProviderTestRequest(BaseModel):
@@ -365,9 +393,14 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
     registry = get_registry()
     settings = load_settings()
     profile = settings.council_profile or "tiny"
+    run_mode = (request.run_mode or settings.default_run_mode or "full").strip().lower()
+    if run_mode not in ("full", "quick"):
+        run_mode = "full"
     mode = (request.deliberation_mode or settings.deliberation_mode or "rank").strip().lower()
     if mode not in ("rank", "debate"):
         mode = "rank"
+    if run_mode == "quick":
+        mode = "quick"
     if request.debate_rounds is not None:
         try:
             rounds = max(1, min(3, int(request.debate_rounds)))
@@ -375,12 +408,31 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             rounds = settings.debate_rounds or 1
     else:
         rounds = max(1, min(3, int(settings.debate_rounds or 1)))
+
     members = settings.get_enabled_members()
+    max_members = request.max_members
+    if max_members is None:
+        max_members = settings.default_max_members
+    if max_members is not None:
+        try:
+            max_members = int(max_members)
+            if max_members >= 2:
+                members = members[:max_members]
+        except (TypeError, ValueError):
+            pass
     chairman = settings.get_chairman()
+    if chairman and chairman.id not in {m.id for m in members}:
+        # Keep chairman in the working set when max_members truncates them out
+        enabled = settings.get_enabled_members()
+        for m in enabled:
+            if m.id == chairman.id:
+                members = members + [m]
+                break
 
     async def event_generator():
         user_saved = False
         assistant_saved = False
+        inflight: Set[asyncio.Task] = set()
 
         if _council_lock.locked():
             yield f"data: {json.dumps({'type': 'error', 'message': 'Council is busy with another request. Please wait for it to finish.'})}\n\n"
@@ -396,6 +448,7 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                     title_task = asyncio.create_task(
                         generate_conversation_title(registry, request.content, profile)
                     )
+                    inflight.add(title_task)
 
                 if len(members) < 2:
                     yield f"data: {json.dumps({'type': 'error', 'message': 'At least 2 enabled council members required. Configure in Settings.'})}\n\n"
@@ -404,8 +457,17 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
 
                 web_context = ""
                 web_search_info: Optional[Dict[str, Any]] = None
+                want_search = request.use_web_search
+                if want_search and settings.web_search_auto and should_auto_skip_web_search(
+                    request.content
+                ):
+                    skip_message = "Skipped web search (query does not look like it needs fresh facts)."
+                    skipped = WebSearchResult(query=request.content, error=skip_message)
+                    web_search_info = web_search_metadata(skipped, enabled=True)
+                    yield f"data: {json.dumps({'type': 'web_search_skipped', 'message': skip_message, 'data': web_search_info})}\n\n"
+                    want_search = False
 
-                if request.use_web_search:
+                if want_search:
                     yield f"data: {json.dumps({'type': 'web_search_start'})}\n\n"
                     if not is_web_search_configured():
                         skip_message = serper_key_setup_message()
@@ -414,10 +476,15 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                         yield f"data: {json.dumps({'type': 'web_search_skipped', 'message': skip_message, 'data': web_search_info})}\n\n"
                     else:
                         if title_task:
-                            search_result, title = await asyncio.gather(
-                                search_web(request.content, profile),
-                                title_task,
+                            search_task = asyncio.create_task(
+                                search_web(request.content, profile)
                             )
+                            inflight.add(search_task)
+                            search_result, title = await asyncio.gather(
+                                search_task, title_task
+                            )
+                            inflight.discard(search_task)
+                            inflight.discard(title_task)
                             title_task = None
                             storage.update_conversation_title(conversation_id, title)
                             yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
@@ -430,33 +497,105 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                             web_context = search_result.context_text
                             yield f"data: {json.dumps({'type': 'web_search_complete', 'data': web_search_info})}\n\n"
 
-                yield f"data: {json.dumps({'type': 'stage1_start', 'members': [{'id': m.id, 'display_name': m.display_name, 'model': m.model} for m in members], 'deliberation_mode': mode})}\n\n"
+                yield f"data: {json.dumps({'type': 'stage1_start', 'members': [{'id': m.id, 'display_name': m.display_name, 'model': m.model} for m in members], 'deliberation_mode': mode, 'run_mode': run_mode})}\n\n"
 
                 stage1_messages = build_stage1_messages(
                     request.content, profile, web_context=web_context
                 )
-                all_stage1: List[dict] = []
+                event_queue: asyncio.Queue = asyncio.Queue()
 
                 async def query_and_track(member):
-                    response = await _complete_with_limits(
-                        registry, member, stage1_messages, "stage1", profile
-                    )
-                    result = {
-                        "member_id": member.id,
-                        "model": member.model,
-                        "display_name": _member_label(member),
-                        "provider_id": member.provider_id,
-                        "response": response.content if not response.error else "",
-                        "error": response.error,
-                        "success": response.error is None,
-                    }
-                    all_stage1.append(result)
-                    return result
+                    try:
+                        cache_key = stage1_cache_key(
+                            member.id,
+                            member.model,
+                            profile,
+                            request.content,
+                            web_context,
+                        )
+                        cached = cache_get_stage1(cache_key)
+                        if cached:
+                            await event_queue.put(
+                                {"type": "member_complete", "data": cached, "cached": True}
+                            )
+                            return cached
 
-                tasks = [query_and_track(m) for m in members]
-                for coro in asyncio.as_completed(tasks):
-                    result = await coro
-                    yield f"data: {json.dumps({'type': 'member_complete', 'data': result})}\n\n"
+                        def on_delta(delta: str, mid: str = member.id) -> None:
+                            event_queue.put_nowait(
+                                {"type": "member_delta", "member_id": mid, "delta": delta}
+                            )
+
+                        response = await _stream_with_limits(
+                            registry,
+                            member,
+                            stage1_messages,
+                            "stage1",
+                            profile,
+                            on_delta=on_delta,
+                        )
+                        result = {
+                            "member_id": member.id,
+                            "model": member.model,
+                            "display_name": _member_label(member),
+                            "provider_id": member.provider_id,
+                            "response": response.content if not response.error else "",
+                            "error": response.error,
+                            "success": response.error is None,
+                        }
+                        if result["success"]:
+                            cache_set_stage1(cache_key, result)
+                        await event_queue.put({"type": "member_complete", "data": result})
+                        return result
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception as exc:
+                        result = {
+                            "member_id": member.id,
+                            "model": member.model,
+                            "display_name": _member_label(member),
+                            "provider_id": member.provider_id,
+                            "response": "",
+                            "error": str(exc),
+                            "success": False,
+                        }
+                        await event_queue.put({"type": "member_complete", "data": result})
+                        return result
+
+                member_tasks = [
+                    asyncio.create_task(query_and_track(m)) for m in members
+                ]
+                for t in member_tasks:
+                    inflight.add(t)
+
+                remaining = len(member_tasks)
+                while remaining > 0:
+                    try:
+                        event = await asyncio.wait_for(
+                            event_queue.get(), timeout=KEEPALIVE_INTERVAL
+                        )
+                    except asyncio.TimeoutError:
+                        yield ": keepalive\n\n"
+                        continue
+                    yield f"data: {json.dumps(event)}\n\n"
+                    if event.get("type") == "member_complete":
+                        remaining -= 1
+
+                all_stage1 = []
+                for t in member_tasks:
+                    inflight.discard(t)
+                    try:
+                        all_stage1.append(await t)
+                    except Exception as exc:
+                        all_stage1.append(
+                            {
+                                "member_id": "",
+                                "model": "",
+                                "display_name": "Unknown",
+                                "response": "",
+                                "error": str(exc),
+                                "success": False,
+                            }
+                        )
 
                 stage1_results = [r for r in all_stage1 if r.get("success")]
                 yield f"data: {json.dumps({'type': 'stage1_complete', 'data': stage1_results, 'all_results': all_stage1})}\n\n"
@@ -472,7 +611,9 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                 ranking_parse_failed = False
                 aggregate_rankings: List[dict] = []
 
-                if mode == "debate":
+                if run_mode == "quick":
+                    yield f"data: {json.dumps({'type': 'stage2_skipped', 'reason': 'quick_mode'})}\n\n"
+                elif mode == "debate":
                     yield f"data: {json.dumps({'type': 'debate_start', 'rounds': rounds})}\n\n"
                     pending_events: List[dict] = []
 
@@ -482,6 +623,16 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                                 "type": "debate_member_complete",
                                 "round": round_number,
                                 "data": result,
+                            }
+                        )
+
+                    def on_debate_delta(round_number: int, member_id: str, delta: str) -> None:
+                        pending_events.append(
+                            {
+                                "type": "debate_member_delta",
+                                "round": round_number,
+                                "member_id": member_id,
+                                "delta": delta,
                             }
                         )
 
@@ -495,6 +646,7 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                             debate_rounds=rounds,
                             web_context=web_context,
                             on_member_complete=on_debate_member,
+                            on_delta=on_debate_delta,
                         )
                     ):
                         while pending_events:
@@ -535,8 +687,14 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                     _rollback_user_message(conversation_id, user_saved, assistant_saved)
                     return
 
+                stage3_pending: List[dict] = []
+
+                def on_stage3_delta(delta: str) -> None:
+                    stage3_pending.append({"type": "stage3_delta", "delta": delta})
+
+                stage3_result = None
                 async for item in _iter_with_keepalive(
-                    stage3_synthesize_final(
+                    stage3_synthesize_final_stream(
                         registry,
                         chairman,
                         request.content,
@@ -547,12 +705,19 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                         web_context=web_context,
                         deliberation_mode=mode,
                         debate_rounds=debate_rounds_data,
+                        on_delta=on_stage3_delta,
                     )
                 ):
+                    while stage3_pending:
+                        event = stage3_pending.pop(0)
+                        yield f"data: {json.dumps(event)}\n\n"
                     if item is None:
                         yield ": keepalive\n\n"
                     else:
                         stage3_result = item
+                while stage3_pending:
+                    event = stage3_pending.pop(0)
+                    yield f"data: {json.dumps(event)}\n\n"
                 yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
 
                 metadata = {
@@ -560,7 +725,8 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                     "aggregate_rankings": aggregate_rankings,
                     "ranking_parse_failed": ranking_parse_failed,
                     "council_profile": profile,
-                    "deliberation_mode": mode,
+                    "deliberation_mode": "rank" if mode == "quick" else mode,
+                    "run_mode": run_mode,
                     "debate_rounds_count": len(debate_rounds_data),
                     "failed_members": [
                         r.get("display_name")
@@ -573,6 +739,7 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
 
                 if title_task:
                     title = await title_task
+                    inflight.discard(title_task)
                     storage.update_conversation_title(conversation_id, title)
                     yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
 
@@ -588,11 +755,13 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                 yield f"data: {json.dumps({'type': 'complete'})}\n\n"
 
             except asyncio.CancelledError:
+                _cancel_tasks(inflight)
                 if title_task and not title_task.done():
                     title_task.cancel()
                 _rollback_user_message(conversation_id, user_saved, assistant_saved)
                 raise
             except Exception as exc:
+                _cancel_tasks(inflight)
                 _rollback_user_message(conversation_id, user_saved, assistant_saved)
                 yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
 
