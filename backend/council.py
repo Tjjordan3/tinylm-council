@@ -358,12 +358,22 @@ async def stage2_collect_rankings(
             on_member_complete(result)
         return result
 
-    stage2_results = []
-    for coro in asyncio.as_completed([rank_member(member) for member in ranking_members]):
-        result = await coro
-        if result is not None:
-            stage2_results.append(result)
-    return stage2_results, label_to_model, any_parse_failed
+    # Track tasks explicitly so cancel cancels sibling rank_member work
+    # (asyncio.as_completed alone leaves peers running on CancelledError).
+    tasks = [asyncio.create_task(rank_member(member)) for member in ranking_members]
+    stage2_results: List[Dict[str, Any]] = []
+    try:
+        for fut in asyncio.as_completed(tasks):
+            result = await fut
+            if result is not None:
+                stage2_results.append(result)
+        return stage2_results, label_to_model, any_parse_failed
+    finally:
+        pending = [task for task in tasks if not task.done()]
+        if pending:
+            for task in pending:
+                task.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
 
 
 async def stage2_run_debate_rounds(

@@ -4,6 +4,11 @@ All notable changes to TinyLM Council are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Mid-stream conversation switch** — aborting or switching chats no longer lets late SSE/delta flushes overwrite the newly selected conversation
+- **Stage 2 rank cancel** — cancelling Stage 2 now cancels sibling `rank_member` tasks instead of leaving orphans after `as_completed`
+
 ## [0.8.0] - 2026-10-11
 
 ### Added
