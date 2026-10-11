@@ -9,7 +9,9 @@ use tauri_plugin_shell::process::CommandChild;
 use tauri_plugin_shell::ShellExt;
 
 const API_HOST: &str = "127.0.0.1";
-const API_PORT: u16 = 8001;
+// Dedicated desktop port so a leftover start.ps1 / browser backend on :8001 cannot
+// silently handle Tauri UI requests (which made Debate settings appear to "revert").
+const API_PORT: u16 = 18765;
 
 pub enum BackendProcess {
   Sidecar(CommandChild),

@@ -29,7 +29,7 @@ Optional secrets can go in `%LOCALAPPDATA%\TinyLM Council\.env` (same keys as [`
 | Piece | Role |
 |-------|------|
 | **TinyLM Council.exe** / NSIS installer | Desktop window, taskbar icon, app lifecycle |
-| **tinylm-council-api.exe** (sidecar) | Local FastAPI server on `127.0.0.1:8001` |
+| **tinylm-council-api.exe** (sidecar) | Local FastAPI server on `127.0.0.1:18765` (not `:8001`) |
 | **User data** | `%LOCALAPPDATA%\TinyLM Council\` (`settings.json`, `conversations\`, optional `.env`) |
 
 Ollama, LM Studio, and cloud providers are **not** bundled. Install and run them separately.
@@ -38,7 +38,7 @@ Ollama, LM Studio, and cloud providers are **not** bundled. Install and run them
 flowchart LR
   subgraph desktop [TinyLM Council app]
     UI[WebView2 UI]
-    API[API sidecar :8001]
+    API[API sidecar :18765]
   end
   UI -->|HTTP /api| API
   API --> Ollama
@@ -109,6 +109,7 @@ Installer output:
 
 ## Notes
 
-- The UI talks to `http://127.0.0.1:8001` inside the desktop shell.
+- The UI talks to `http://127.0.0.1:18765` inside the desktop shell (a dedicated port so an old `start.ps1` server on `:8001` cannot take over).
+- If Debate mode will not stay selected after Save, fully quit the desktop app and stop any `start.ps1` / Python backend still listening on port 8001, then reopen **v0.7.1+**.
 - Closing the app stops the sidecar.
 - macOS / Linux app bundles are out of scope for v1; the Tauri project can be extended later with additional `bundle.targets`.

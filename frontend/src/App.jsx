@@ -517,8 +517,9 @@ export default function App() {
             <Settings
               settings={settings}
               onSave={async (updated) => {
-                await api.updateSettings(updated);
-                await loadSettings();
+                const saved = await api.updateSettings(updated);
+                setSettings(saved);
+                return saved;
               }}
             />
           }

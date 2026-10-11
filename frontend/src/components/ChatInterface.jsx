@@ -26,6 +26,7 @@ export default function ChatInterface({
   const [deliberationMode, setDeliberationMode] = useState(
     settings?.deliberation_mode === 'debate' ? 'debate' : 'rank'
   );
+  const [modeTouched, setModeTouched] = useState(false);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -33,10 +34,12 @@ export default function ChatInterface({
   }, [conversation]);
 
   useEffect(() => {
+    // Only sync from Settings when the user has not overridden Mode in the composer.
+    if (modeTouched) return;
     if (settings?.deliberation_mode === 'debate' || settings?.deliberation_mode === 'rank') {
       setDeliberationMode(settings.deliberation_mode);
     }
-  }, [settings?.deliberation_mode]);
+  }, [settings?.deliberation_mode, modeTouched]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -192,7 +195,10 @@ export default function ChatInterface({
               Mode
               <select
                 value={deliberationMode}
-                onChange={(e) => setDeliberationMode(e.target.value)}
+                onChange={(e) => {
+                  setModeTouched(true);
+                  setDeliberationMode(e.target.value);
+                }}
                 disabled={isLoading}
                 className="rounded-lg border border-gray-700 bg-[#12141c] px-2 py-1 text-gray-200"
               >

@@ -3,8 +3,9 @@ function resolveApiBase() {
     return import.meta.env.VITE_API_BASE;
   }
   // Tauri webview is not same-origin with the FastAPI sidecar.
+  // Use a dedicated port (not 8001) so an old start.ps1 backend cannot steal requests.
   if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
-    return 'http://127.0.0.1:8001';
+    return 'http://127.0.0.1:18765';
   }
   return '';
 }
@@ -97,8 +98,11 @@ export const api = {
   ) {
     let reader;
     try {
-      const body = { content, use_web_search: useWebSearch };
-      if (deliberationMode) body.deliberation_mode = deliberationMode;
+      const body = {
+        content,
+        use_web_search: useWebSearch,
+        deliberation_mode: deliberationMode || 'rank',
+      };
       if (debateRounds != null) body.debate_rounds = debateRounds;
       const response = await fetch(
         `${API_BASE}/api/conversations/${conversationId}/message/stream`,

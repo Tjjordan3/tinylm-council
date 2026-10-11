@@ -172,6 +172,7 @@ Use this when you want models to argue before a final consensus, instead of only
 - Start with **1 round** on Tiny / small local models; use 2 on Standard or stronger models.
 - You still need at least **2 enabled members** plus a **chairman**.
 - Ranked peer review remains the default; switch back anytime in Settings or the composer Mode control.
+- Desktop app **v0.7.1+**: if Debate snaps back to Ranked after Save, quit the app and stop any old backend on port **8001** (`start.ps1`), then reopen the installer build (desktop API uses port **18765**).
 
 ## Using the app
 

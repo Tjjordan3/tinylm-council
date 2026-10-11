@@ -65,6 +65,9 @@ _CORS_ORIGINS = [
     "http://127.0.0.1:1420",
 ]
 
+APP_VERSION = "0.7.1"
+APP_FEATURES = ["debate"]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_CORS_ORIGINS,
@@ -145,21 +148,33 @@ class AddMemberRequest(BaseModel):
 
 @app.get("/")
 async def root():
-    return {"status": "ok", "service": "TinyLM Council API"}
+    return {
+        "status": "ok",
+        "service": "TinyLM Council API",
+        "version": APP_VERSION,
+        "features": APP_FEATURES,
+    }
 
 
 @app.get("/api/settings")
 async def get_settings():
     settings = load_settings()
-    return settings_to_dict(settings)
+    payload = settings_to_dict(settings)
+    payload["app_version"] = APP_VERSION
+    payload["features"] = APP_FEATURES
+    return payload
 
 
 @app.put("/api/settings")
 async def put_settings(request: SettingsUpdateRequest):
     data = request.model_dump(exclude_none=True)
+    # Always apply deliberation fields when present (including explicit "rank").
     settings = update_settings(data)
     refresh_registry()
-    return settings_to_dict(settings)
+    payload = settings_to_dict(settings)
+    payload["app_version"] = APP_VERSION
+    payload["features"] = APP_FEATURES
+    return payload
 
 
 @app.get("/api/providers/presets")

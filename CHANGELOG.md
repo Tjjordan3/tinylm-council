@@ -4,6 +4,13 @@ All notable changes to TinyLM Council are documented here.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-10-11
+
+### Fixed
+
+- **Debate settings reverting on Save** — desktop app now uses API port `18765` so a leftover `start.ps1` backend on `:8001` cannot ignore Debate fields; Settings save applies the server response and warns if Debate did not persist
+- **Composer Mode override** — chat Mode no longer gets reset from Settings while you are actively choosing Debate/Rank
+
 ## [0.7.0] - 2026-10-11
 
 ### Added
@@ -107,6 +114,7 @@ All notable changes to TinyLM Council are documented here.
 - Windows launcher (`start.ps1`)
 - LM Studio council reliability improvements
 
+[0.7.1]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.7.1
 [0.7.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.7.0
 [0.6.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.6.0
 [0.5.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.5.0

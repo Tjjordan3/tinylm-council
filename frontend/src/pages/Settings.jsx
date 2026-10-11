@@ -65,10 +65,23 @@ export default function Settings({ settings: initialSettings, onSave }) {
   const [nvidiaTest, setNvidiaTest] = useState(null);
 
   useEffect(() => {
+    if (!initialSettings) return;
     setSettings(initialSettings);
     setSerperApiKeyInput('');
     setNvidiaApiKeyInput('');
-  }, [initialSettings]);
+  }, [
+    initialSettings?.chairman_member_id,
+    initialSettings?.council_profile,
+    initialSettings?.deliberation_mode,
+    initialSettings?.debate_rounds,
+    initialSettings?.setup_complete,
+    initialSettings?.parallel_local_inference,
+    initialSettings?.serper_api_key_source,
+    initialSettings?.nvidia_api_key_source,
+    // Re-sync when provider/member lists change length or ids.
+    initialSettings?.providers?.map((p) => p.id).join(','),
+    initialSettings?.council_members?.map((m) => `${m.id}:${m.enabled}`).join(','),
+  ]);
 
   useEffect(() => {
     api.getPresets().then(setPresets).catch(console.error);
@@ -198,11 +211,40 @@ export default function Settings({ settings: initialSettings, onSave }) {
   };
 
   const handleSave = async () => {
-    await onSave(buildSavePayload());
-    setSerperApiKeyInput('');
-    setNvidiaApiKeyInput('');
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    const payload = buildSavePayload();
+    const wantedMode = payload.deliberation_mode || 'rank';
+    try {
+      const saved = await onSave(payload);
+      if (saved && typeof saved === 'object') {
+        setSettings((prev) => ({ ...prev, ...saved }));
+        if (
+          wantedMode === 'debate' &&
+          saved.deliberation_mode !== 'debate'
+        ) {
+          alert(
+            'Debate mode did not persist. The app may be talking to an old backend on port 8001.\n\n' +
+              'Close any start.ps1 / browser TinyLM Council servers, fully quit this app, then reopen the desktop app (v0.7.1+ uses port 18765).'
+          );
+          return;
+        }
+        if (
+          Array.isArray(saved.features) &&
+          wantedMode === 'debate' &&
+          !saved.features.includes('debate')
+        ) {
+          alert(
+            'This backend does not support Debate mode. Update to the latest desktop installer from GitHub Releases.'
+          );
+          return;
+        }
+      }
+      setSerperApiKeyInput('');
+      setNvidiaApiKeyInput('');
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (error) {
+      alert(error.message || 'Failed to save settings');
+    }
   };
 
   const clearSerperKey = async () => {
