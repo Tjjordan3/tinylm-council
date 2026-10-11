@@ -4,11 +4,6 @@ All notable changes to TinyLM Council are documented here.
 
 ## [Unreleased]
 
-### Fixed
-
-- **Mid-stream conversation switch** — aborting or switching chats no longer lets late SSE/delta flushes overwrite the newly selected conversation
-- **Stage 2 rank cancel** — cancelling Stage 2 now cancels sibling `rank_member` tasks instead of leaving orphans after `as_completed`
-
 ## [0.8.0] - 2026-10-11
 
 ### Added
@@ -40,6 +35,8 @@ All notable changes to TinyLM Council are documented here.
 - **Empty-chat Send race** — auto-created conversations no longer wipe the optimistic streaming bubble
 - **Regenerate + web search** — persisted `context_text` is reused for Stage 3 regen and Stage 1 cache keys
 - **Max members + chairman** — forcing the chairman in no longer exceeds the member cap
+- **Mid-stream conversation switch** — aborting or switching chats no longer lets late SSE/delta flushes overwrite the newly selected conversation
+- **Stage 2 rank cancel** — cancelling Stage 2 now cancels sibling `rank_member` tasks instead of leaving orphans after `as_completed`
 
 ## [0.7.1] - 2026-10-11
 
