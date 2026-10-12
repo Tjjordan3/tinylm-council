@@ -759,6 +759,29 @@ export default function Settings({ settings: initialSettings, onSave }) {
                     />
                     Enabled
                   </label>
+                  <label
+                    className="flex items-center gap-2 text-sm text-gray-300"
+                    title="Send attached images to this member as vision input. Leave unset to auto-detect from the model name."
+                  >
+                    <input
+                      type="checkbox"
+                      checked={member.vision_capable === true}
+                      onChange={() =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          council_members: prev.council_members.map((m) =>
+                            m.id === member.id
+                              ? {
+                                  ...m,
+                                  vision_capable: m.vision_capable === true ? null : true,
+                                }
+                              : m
+                          ),
+                        }))
+                      }
+                    />
+                    Vision
+                  </label>
                   <button
                     onClick={() => removeMember(member.id)}
                     className="text-sm text-red-400 hover:text-red-300"

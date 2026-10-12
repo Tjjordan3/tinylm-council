@@ -463,6 +463,7 @@ export default function App() {
       typeof options === 'object' && options.maxMembers != null
         ? options.maxMembers
         : settings?.default_max_members;
+    const files = typeof options === 'object' && Array.isArray(options.files) ? options.files : [];
 
     let conversationId = currentConversationId;
     if (!conversationId) {
@@ -508,8 +509,30 @@ export default function App() {
       });
     };
 
+    let uploadedAttachments = [];
     try {
-      const userMessage = { role: 'user', content };
+      if (files.length) {
+        uploadedAttachments = [];
+        for (const file of files) {
+          const meta = await api.uploadAttachment(conversationId, file);
+          uploadedAttachments.push(meta);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to upload attachments:', error);
+      alert(error.message || 'Failed to upload attachments');
+      setIsLoading(false);
+      streamingConversationIdRef.current = null;
+      abortControllerRef.current = null;
+      return;
+    }
+
+    try {
+      const userMessage = {
+        role: 'user',
+        content,
+        attachments: uploadedAttachments,
+      };
       applyStreamUpdate(conversationId, (prev) => ({
         ...prev,
         messages: [...(prev?.messages || []), userMessage],
@@ -861,6 +884,7 @@ export default function App() {
           debateRounds,
           runMode,
           maxMembers,
+          attachmentIds: uploadedAttachments.map((a) => a.id),
         }
       );
 

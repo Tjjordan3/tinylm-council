@@ -4,6 +4,12 @@ All notable changes to TinyLM Council are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **File / code attachments** — attach text and source files to a council turn; files persist under app data and are packed into Stage 1 with Tiny/Standard budgets
+- **Image attachments** — attach png/jpeg/webp/gif; vision-capable members receive multimodal Stage 1 input (heuristic or Settings “Vision” flag); others get filenames only
+- **Attachment APIs** — `POST/GET/DELETE /api/conversations/{id}/attachments/{…}`; conversation delete removes stored files
+
 ## [0.8.0] - 2026-10-11
 
 ### Added

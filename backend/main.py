@@ -8,12 +8,24 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional, Set
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 from . import storage
+from .attachments import (
+    AttachmentError,
+    build_attachments_context,
+    delete_attachments,
+    get_attachment,
+    image_data_url,
+    model_supports_vision,
+    public_meta,
+    resolve_attachment_metas,
+    save_upload,
+    attachment_file_path,
+)
 from .council import (
     _member_label,
     _stream_with_limits,
@@ -25,7 +37,7 @@ from .council import (
     stage3_synthesize_final_stream,
 )
 from .http_client import close_http_clients
-from .prompts import build_stage1_messages
+from .prompts import build_stage1_messages, build_stage1_messages_with_images
 from .model_manager import (
     delete_model,
     get_popular_models,
@@ -77,7 +89,7 @@ _CORS_ORIGINS = [
 ]
 
 APP_VERSION = "0.8.0"
-APP_FEATURES = ["debate", "streaming", "quick_mode"]
+APP_FEATURES = ["debate", "streaming", "quick_mode", "attachments"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -165,9 +177,22 @@ async def _cancel_tasks(tasks: Set[asyncio.Task]) -> None:
         await asyncio.gather(*pending, return_exceptions=True)
 
 
-def _rollback_user_message(conversation_id: str, user_saved: bool, assistant_saved: bool) -> None:
+def _rollback_user_message(
+    conversation_id: str,
+    user_saved: bool,
+    assistant_saved: bool,
+    attachment_ids: Optional[List[str]] = None,
+) -> None:
     if user_saved and not assistant_saved:
+        # Prefer cleaning ids from the rolled-back user message when present.
+        ids = attachment_ids or [
+            a.get("id")
+            for a in storage.peek_last_user_attachments(conversation_id)
+            if a.get("id")
+        ]
         storage.remove_last_user_message(conversation_id)
+        if ids:
+            delete_attachments(conversation_id, [i for i in ids if i])
 
 
 def get_registry() -> ProviderRegistry:
@@ -187,6 +212,7 @@ class SendMessageRequest(BaseModel):
     debate_rounds: Optional[int] = None
     run_mode: Optional[str] = None
     max_members: Optional[int] = None
+    attachment_ids: Optional[List[str]] = None
 
 
 class ProviderTestRequest(BaseModel):
@@ -433,6 +459,53 @@ async def delete_conversation(conversation_id: str):
     return {"ok": True}
 
 
+@app.post("/api/conversations/{conversation_id}/attachments")
+async def upload_attachment(conversation_id: str, file: UploadFile = File(...)):
+    conversation = storage.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    raw = await file.read()
+    try:
+        meta = save_upload(
+            conversation_id,
+            file.filename or "file",
+            raw,
+            content_type=file.content_type,
+        )
+    except AttachmentError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return meta
+
+
+@app.get("/api/conversations/{conversation_id}/attachments/{attachment_id}")
+async def download_attachment(conversation_id: str, attachment_id: str):
+    conversation = storage.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    meta = get_attachment(conversation_id, attachment_id)
+    if meta is None:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    path = attachment_file_path(conversation_id, meta)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Attachment file missing")
+    return FileResponse(
+        path,
+        media_type=meta.get("content_type") or "application/octet-stream",
+        filename=meta.get("name") or path.name,
+    )
+
+
+@app.delete("/api/conversations/{conversation_id}/attachments/{attachment_id}")
+async def remove_attachment(conversation_id: str, attachment_id: str):
+    conversation = storage.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    if get_attachment(conversation_id, attachment_id) is None:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    delete_attachments(conversation_id, [attachment_id])
+    return {"ok": True}
+
+
 @app.post("/api/conversations/{conversation_id}/regenerate-chairman/stream")
 async def regenerate_chairman_stream(conversation_id: str):
     """Re-run Stage 3 only, reusing stored Stage 1 / deliberation (and Stage 1 cache on retries)."""
@@ -620,8 +693,27 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
 
         async with _council_lock:
             title_task = None
+            attachment_ids = list(request.attachment_ids or [])
+            attachment_public: List[Dict[str, Any]] = []
+            attachments_context = ""
+            image_metas: List[Dict[str, Any]] = []
             try:
-                storage.add_user_message(conversation_id, request.content)
+                if attachment_ids:
+                    try:
+                        resolved = resolve_attachment_metas(conversation_id, attachment_ids)
+                        attachment_public = [public_meta(m) for m in resolved]
+                        attachments_context, _text_metas, image_metas = build_attachments_context(
+                            conversation_id, attachment_ids, profile
+                        )
+                    except AttachmentError as exc:
+                        yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+                        return
+
+                storage.add_user_message(
+                    conversation_id,
+                    request.content,
+                    attachments=attachment_public or None,
+                )
                 user_saved = True
 
                 if is_first_message:
@@ -632,7 +724,9 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
 
                 if len(members) < 2:
                     yield f"data: {json.dumps({'type': 'error', 'message': 'At least 2 enabled council members required. Configure in Settings.'})}\n\n"
-                    _rollback_user_message(conversation_id, user_saved, assistant_saved)
+                    _rollback_user_message(
+                        conversation_id, user_saved, assistant_saved, attachment_ids
+                    )
                     return
 
                 web_context = ""
@@ -677,10 +771,16 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                             web_context = search_result.context_text
                             yield f"data: {json.dumps({'type': 'web_search_complete', 'data': web_search_info})}\n\n"
 
-                yield f"data: {json.dumps({'type': 'stage1_start', 'members': [{'id': m.id, 'display_name': m.display_name, 'model': m.model} for m in members], 'deliberation_mode': mode, 'run_mode': run_mode})}\n\n"
+                yield f"data: {json.dumps({'type': 'stage1_start', 'members': [{'id': m.id, 'display_name': m.display_name, 'model': m.model} for m in members], 'deliberation_mode': mode, 'run_mode': run_mode, 'attachments': attachment_public})}\n\n"
 
-                stage1_messages = build_stage1_messages(
-                    request.content, profile, web_context=web_context
+                image_urls = [
+                    image_data_url(conversation_id, meta) for meta in image_metas
+                ]
+                text_only_stage1 = build_stage1_messages(
+                    request.content,
+                    profile,
+                    web_context=web_context,
+                    attachments_context=attachments_context,
                 )
                 event_queue: asyncio.Queue = asyncio.Queue()
 
@@ -692,6 +792,7 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                             profile,
                             request.content,
                             web_context,
+                            attachments_context,
                         )
                         cached = cache_get_stage1(cache_key)
                         if cached:
@@ -705,10 +806,25 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                                 {"type": "member_delta", "member_id": mid, "delta": delta}
                             )
 
+                        use_vision = bool(image_urls) and model_supports_vision(
+                            member.model, member.vision_capable
+                        )
+                        member_messages = (
+                            build_stage1_messages_with_images(
+                                request.content,
+                                profile,
+                                web_context=web_context,
+                                attachments_context=attachments_context,
+                                image_data_urls=image_urls,
+                            )
+                            if use_vision
+                            else text_only_stage1
+                        )
+
                         response = await _stream_with_limits(
                             registry,
                             member,
-                            stage1_messages,
+                            member_messages,
                             "stage1",
                             profile,
                             on_delta=on_delta,
@@ -782,7 +898,9 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
 
                 if not stage1_results:
                     yield f"data: {json.dumps({'type': 'error', 'message': 'All council members failed to respond.'})}\n\n"
-                    _rollback_user_message(conversation_id, user_saved, assistant_saved)
+                    _rollback_user_message(
+                        conversation_id, user_saved, assistant_saved, attachment_ids
+                    )
                     return
 
                 stage2_results: List[dict] = []
@@ -884,7 +1002,9 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                 yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
                 if not chairman:
                     yield f"data: {json.dumps({'type': 'error', 'message': 'No chairman configured.'})}\n\n"
-                    _rollback_user_message(conversation_id, user_saved, assistant_saved)
+                    _rollback_user_message(
+                        conversation_id, user_saved, assistant_saved, attachment_ids
+                    )
                     return
 
                 stage3_queue: asyncio.Queue = asyncio.Queue()
@@ -934,6 +1054,9 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                 }
                 if web_search_info is not None:
                     metadata["web_search"] = web_search_info
+                if attachment_public:
+                    metadata["attachments"] = attachment_public
+                    metadata["attachments_context"] = attachments_context
 
                 if title_task:
                     title = await title_task
@@ -956,11 +1079,15 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                 await _cancel_tasks(inflight)
                 if title_task and not title_task.done():
                     title_task.cancel()
-                _rollback_user_message(conversation_id, user_saved, assistant_saved)
+                _rollback_user_message(
+                    conversation_id, user_saved, assistant_saved, attachment_ids
+                )
                 raise
             except Exception as exc:
                 await _cancel_tasks(inflight)
-                _rollback_user_message(conversation_id, user_saved, assistant_saved)
+                _rollback_user_message(
+                    conversation_id, user_saved, assistant_saved, attachment_ids
+                )
                 yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
 
     return StreamingResponse(

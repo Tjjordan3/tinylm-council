@@ -183,6 +183,7 @@ Use this when you want models to argue before a final consensus, instead of only
 - **Regenerate chairman** — on a finished reply, **Regenerate chairman** re-runs Stage 3 only (keeps Stage 1 / deliberation).
 - **Deliberation mode** — see [Debate mode (summary)](#debate-mode-summary) above; ranked peer review is the default.
 - **Empty chat** — type in the composer with no conversation selected; a new chat is created on Send.
+- **Attach files** — use **Attach** for source/text files (and images). Caps: 8 text files (256 KB each) and 4 images (4 MB each) per message. Text is injected into Stage 1 under a Tiny/Standard budget. Images are sent only to vision-capable models (auto-detect or Settings → member **Vision**). Files are stored with the conversation and removed when the chat is deleted.
 - **One at a time** — wait for a run to finish (or stop it) before sending another question.
 - **Failed models** — one bad model does not stop the council; remove unreliable models in Settings.
 - **Web search** — check **Search the web first** before sending; add your Serper key in **Settings → Web search** or in `.env` ([serper.dev](https://serper.dev), ~2,500 free searches/month). Sources show in the **Web sources** panel. Council still runs if the key is missing (with a warning). Optional **Skip search when not needed** in Settings uses a small heuristic when the toggle is on.

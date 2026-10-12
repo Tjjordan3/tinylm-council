@@ -159,6 +159,7 @@ def settings_to_dict(settings: AppSettings, *, include_secrets: bool = False) ->
                 "model": m.model,
                 "display_name": m.display_name,
                 "enabled": m.enabled,
+                "vision_capable": m.vision_capable,
             }
             for m in settings.council_members
         ],

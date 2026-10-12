@@ -56,6 +56,13 @@ def conversations_dir() -> Path:
     return path
 
 
+def attachments_dir(conversation_id: str) -> Path:
+    """Per-conversation attachment files under the user data root."""
+    path = app_data_dir() / "attachments" / conversation_id
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 def load_env_files() -> None:
     """Load .env from the project root (dev) and the user data dir (overrides)."""
     from dotenv import load_dotenv

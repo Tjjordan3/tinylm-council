@@ -6,7 +6,7 @@ import asyncio
 import json
 import os
 import time
-from typing import AsyncIterator, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
 
@@ -100,7 +100,7 @@ class OpenAICompatibleProvider:
     def _build_payload(
         self,
         model: str,
-        messages: List[Dict[str, str]],
+        messages: List[Dict[str, Any]],
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
         stream: bool = False,
@@ -117,7 +117,7 @@ class OpenAICompatibleProvider:
     async def complete(
         self,
         model: str,
-        messages: List[Dict[str, str]],
+        messages: List[Dict[str, Any]],
         timeout: float = 120.0,
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
@@ -147,7 +147,7 @@ class OpenAICompatibleProvider:
     async def complete_stream(
         self,
         model: str,
-        messages: List[Dict[str, str]],
+        messages: List[Dict[str, Any]],
         timeout: float = 120.0,
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,

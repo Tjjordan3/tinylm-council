@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 STAGE_LIMITS = {
@@ -38,11 +38,37 @@ def format_web_context_block(web_context: str) -> str:
     )
 
 
-def build_stage1_messages(
-    user_query: str, profile: str, web_context: str = ""
-) -> List[Dict[str, str]]:
+def format_attachments_block(attachments_context: str) -> str:
+    if not attachments_context or not attachments_context.strip():
+        return ""
+    return f"{attachments_context.strip()}\n\n"
+
+
+def build_stage1_user_text(
+    user_query: str,
+    web_context: str = "",
+    attachments_context: str = "",
+) -> str:
+    parts = []
     web_block = format_web_context_block(web_context)
-    user_content = f"{web_block}Question: {user_query}" if web_block else user_query
+    if web_block:
+        parts.append(web_block.rstrip())
+    attach_block = format_attachments_block(attachments_context)
+    if attach_block:
+        parts.append(attach_block.rstrip())
+    parts.append(f"Question: {user_query}" if parts else user_query)
+    return "\n\n".join(parts)
+
+
+def build_stage1_messages(
+    user_query: str,
+    profile: str,
+    web_context: str = "",
+    attachments_context: str = "",
+) -> List[dict]:
+    user_content = build_stage1_user_text(
+        user_query, web_context=web_context, attachments_context=attachments_context
+    )
 
     if profile == "tiny":
         return [
@@ -53,6 +79,39 @@ def build_stage1_messages(
             {"role": "user", "content": user_content},
         ]
     return [{"role": "user", "content": user_content}]
+
+
+def build_stage1_messages_with_images(
+    user_query: str,
+    profile: str,
+    web_context: str = "",
+    attachments_context: str = "",
+    image_data_urls: Optional[List[str]] = None,
+) -> List[dict]:
+    """Stage 1 messages; when image_data_urls set, user content is multimodal parts."""
+    text = build_stage1_user_text(
+        user_query, web_context=web_context, attachments_context=attachments_context
+    )
+    urls = [u for u in (image_data_urls or []) if u]
+    if not urls:
+        return build_stage1_messages(
+            user_query, profile, web_context=web_context, attachments_context=attachments_context
+        )
+
+    user_content: List[dict] = [{"type": "text", "text": text}]
+    for url in urls:
+        user_content.append({"type": "image_url", "image_url": {"url": url}})
+
+    messages: List[dict] = [{"role": "user", "content": user_content}]
+    if profile == "tiny":
+        messages.insert(
+            0,
+            {
+                "role": "system",
+                "content": "Answer in 2-5 sentences. Be direct and accurate. Use attached images when relevant.",
+            },
+        )
+    return messages
 
 
 def build_stage2_prompt(

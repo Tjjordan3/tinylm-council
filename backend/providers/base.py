@@ -58,6 +58,7 @@ class CouncilMember:
     model: str
     display_name: str
     enabled: bool = True
+    vision_capable: Optional[bool] = None
 
 
 @dataclass
@@ -77,7 +78,7 @@ class LLMProvider(Protocol):
     async def complete(
         self,
         model: str,
-        messages: List[Dict[str, str]],
+        messages: List[Dict[str, Any]],
         timeout: float = 120.0,
     ) -> CompletionResult: ...
 

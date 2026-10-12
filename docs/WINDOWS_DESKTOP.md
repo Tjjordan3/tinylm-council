@@ -64,6 +64,7 @@ See [WINDOWS_SETUP.md](WINDOWS_SETUP.md) for provider tips, Tailscale phone acce
 - **Max members** — limit a run to 2–4 enabled models from the composer.
 - **Regenerate chairman** — on a finished answer, re-run Stage 3 only (reuses stored Stage 1 / debate).
 - **Stop** cancels in-flight work and frees the council for the next question.
+- **Attachments** — composer **Attach** adds text/code files (and images). Text/code is packed into Stage 1 (limits: 8 files, 256 KB each). Images go to vision-capable members; mark **Vision** on a member in Settings or use a vision model name. Attachments persist with the chat.
 
 ## Debate mode (summary)
 

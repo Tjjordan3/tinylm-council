@@ -10,8 +10,18 @@ from .context_utils import truncate_text
 
 # Rough budgets for prompt packing (not model context windows).
 STAGE_INPUT_BUDGETS = {
-    "tiny": {"stage2_brief": 900, "per_member_own": 200, "debate_others": 700},
-    "standard": {"stage2_brief": 3000, "per_member_own": 800, "debate_others": 2400},
+    "tiny": {
+        "stage2_brief": 900,
+        "per_member_own": 200,
+        "debate_others": 700,
+        "attachments": 1200,
+    },
+    "standard": {
+        "stage2_brief": 3000,
+        "per_member_own": 800,
+        "debate_others": 2400,
+        "attachments": 4000,
+    },
 }
 
 
@@ -114,6 +124,7 @@ def stage1_cache_key(
     profile: str,
     query: str,
     web_context: str,
+    attachments_context: str = "",
 ) -> str:
     return "|".join(
         [
@@ -122,6 +133,7 @@ def stage1_cache_key(
             profile,
             hash_text(query),
             hash_text(web_context or ""),
+            hash_text(attachments_context or ""),
         ]
     )
 

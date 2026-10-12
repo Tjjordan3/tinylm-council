@@ -65,6 +65,37 @@ export const api = {
   deleteConversation: (id) =>
     request(`/api/conversations/${id}`, { method: 'DELETE' }),
 
+  attachmentUrl(conversationId, attachmentId) {
+    return `${API_BASE}/api/conversations/${conversationId}/attachments/${attachmentId}`;
+  },
+
+  async uploadAttachment(conversationId, file) {
+    const body = new FormData();
+    body.append('file', file, file.name);
+    const response = await fetch(
+      `${API_BASE}/api/conversations/${conversationId}/attachments`,
+      { method: 'POST', body }
+    );
+    if (!response.ok) {
+      let detail = 'Failed to upload attachment';
+      try {
+        const data = await response.json();
+        detail = data.detail || detail;
+      } catch {
+        const text = await response.text();
+        if (text) detail = text;
+      }
+      throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+    }
+    return response.json();
+  },
+
+  async deleteAttachment(conversationId, attachmentId) {
+    return request(`/api/conversations/${conversationId}/attachments/${attachmentId}`, {
+      method: 'DELETE',
+    });
+  },
+
   async pullModelStream(providerId, model, onEvent) {
     const response = await fetch(`${API_BASE}/api/providers/${providerId}/models/pull`, {
       method: 'POST',
@@ -101,6 +132,7 @@ export const api = {
       debateRounds,
       runMode,
       maxMembers,
+      attachmentIds,
     } = {}
   ) {
     let reader;
@@ -113,6 +145,7 @@ export const api = {
       if (debateRounds != null) body.debate_rounds = debateRounds;
       if (runMode) body.run_mode = runMode;
       if (maxMembers != null) body.max_members = maxMembers;
+      if (attachmentIds?.length) body.attachment_ids = attachmentIds;
       const response = await fetch(
         `${API_BASE}/api/conversations/${conversationId}/message/stream`,
         {

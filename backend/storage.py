@@ -70,11 +70,18 @@ def list_conversations() -> List[Dict[str, Any]]:
     return conversations
 
 
-def add_user_message(conversation_id: str, content: str) -> None:
+def add_user_message(
+    conversation_id: str,
+    content: str,
+    attachments: Optional[List[Dict[str, Any]]] = None,
+) -> None:
     conversation = get_conversation(conversation_id)
     if conversation is None:
         raise ValueError(f"Conversation {conversation_id} not found")
-    conversation["messages"].append({"role": "user", "content": content})
+    message: Dict[str, Any] = {"role": "user", "content": content}
+    if attachments:
+        message["attachments"] = attachments
+    conversation["messages"].append(message)
     save_conversation(conversation)
 
 
@@ -89,6 +96,16 @@ def remove_last_user_message(conversation_id: str) -> bool:
     conversation["messages"] = messages[:-1]
     save_conversation(conversation)
     return True
+
+
+def peek_last_user_attachments(conversation_id: str) -> List[Dict[str, Any]]:
+    conversation = get_conversation(conversation_id)
+    if conversation is None:
+        return []
+    messages = conversation.get("messages") or []
+    if not messages or messages[-1].get("role") != "user":
+        return []
+    return list(messages[-1].get("attachments") or [])
 
 
 def add_assistant_message(
@@ -152,4 +169,10 @@ def delete_conversation(conversation_id: str) -> bool:
     if not path.exists():
         return False
     path.unlink()
+    try:
+        from .attachments import delete_conversation_attachments
+
+        delete_conversation_attachments(conversation_id)
+    except Exception:
+        pass
     return True

@@ -87,12 +87,16 @@ def config_from_dict(data: dict) -> ProviderConfig:
 
 
 def member_from_dict(data: dict) -> CouncilMember:
+    vision = data.get("vision_capable")
+    if vision is not None:
+        vision = bool(vision)
     return CouncilMember(
         id=data["id"],
         provider_id=data["provider_id"],
         model=data["model"],
         display_name=data.get("display_name", data["model"]),
         enabled=data.get("enabled", True),
+        vision_capable=vision,
     )
 
 
