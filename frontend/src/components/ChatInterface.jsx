@@ -78,7 +78,7 @@ export default function ChatInterface({
 
   const composer = (
     <div className="composer-shell border-t border-[var(--border)] p-3 md:p-4">
-      <form onSubmit={handleSubmit} className="mx-auto flex max-w-4xl flex-col gap-3">
+      <form onSubmit={handleSubmit} className="mx-auto flex max-w-6xl flex-col gap-3">
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -86,86 +86,88 @@ export default function ChatInterface({
           disabled={isLoading}
           rows={2}
           placeholder="Ask the council a question..."
-          className="flex-1 resize-none rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-[var(--text)] placeholder-[var(--muted)] focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
+          className="w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-[var(--text)] placeholder-[var(--muted)] focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
         />
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
-          <label className="flex items-center gap-2 text-sm text-[var(--muted)]">
-            <input
-              type="checkbox"
-              checked={useWebSearch}
-              onChange={(e) => setUseWebSearch(e.target.checked)}
-              disabled={isLoading}
-              className="rounded border-gray-600"
-            />
-            Search the web first
-          </label>
-          <label className="flex items-center gap-2 text-sm text-[var(--muted)]">
-            Run
-            <select
-              value={runMode}
-              onChange={(e) => {
-                setRunTouched(true);
-                setRunMode(e.target.value);
-              }}
-              disabled={isLoading}
-              className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1 text-[var(--text)]"
-            >
-              <option value="full">Full council</option>
-              <option value="quick">Quick (skip deliberation)</option>
-            </select>
-          </label>
-          {runMode === 'full' && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2">
             <label className="flex items-center gap-2 text-sm text-[var(--muted)]">
-              Mode
+              <input
+                type="checkbox"
+                checked={useWebSearch}
+                onChange={(e) => setUseWebSearch(e.target.checked)}
+                disabled={isLoading}
+                className="rounded border-gray-600"
+              />
+              Search the web first
+            </label>
+            <label className="flex items-center gap-2 text-sm text-[var(--muted)]">
+              Run
               <select
-                value={deliberationMode}
+                value={runMode}
                 onChange={(e) => {
-                  setModeTouched(true);
-                  setDeliberationMode(e.target.value);
+                  setRunTouched(true);
+                  setRunMode(e.target.value);
                 }}
                 disabled={isLoading}
                 className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1 text-[var(--text)]"
               >
-                <option value="rank">Ranked peer review</option>
-                <option value="debate">Debate</option>
+                <option value="full">Full council</option>
+                <option value="quick">Quick (skip deliberation)</option>
               </select>
             </label>
-          )}
-          <label className="flex items-center gap-2 text-sm text-[var(--muted)]">
-            Members
-            <select
-              value={maxMembers}
-              onChange={(e) => {
-                setMembersTouched(true);
-                setMaxMembers(e.target.value);
-              }}
-              disabled={isLoading}
-              className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1 text-[var(--text)]"
-            >
-              <option value="">All enabled</option>
-              <option value="2">2 members</option>
-              <option value="3">3 members</option>
-              <option value="4">4 members</option>
-            </select>
-          </label>
-        </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-          {isLoading && (
+            {runMode === 'full' && (
+              <label className="flex items-center gap-2 text-sm text-[var(--muted)]">
+                Mode
+                <select
+                  value={deliberationMode}
+                  onChange={(e) => {
+                    setModeTouched(true);
+                    setDeliberationMode(e.target.value);
+                  }}
+                  disabled={isLoading}
+                  className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1 text-[var(--text)]"
+                >
+                  <option value="rank">Ranked peer review</option>
+                  <option value="debate">Debate</option>
+                </select>
+              </label>
+            )}
+            <label className="flex items-center gap-2 text-sm text-[var(--muted)]">
+              Members
+              <select
+                value={maxMembers}
+                onChange={(e) => {
+                  setMembersTouched(true);
+                  setMaxMembers(e.target.value);
+                }}
+                disabled={isLoading}
+                className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1 text-[var(--text)]"
+              >
+                <option value="">All enabled</option>
+                <option value="2">2 members</option>
+                <option value="3">3 members</option>
+                <option value="4">4 members</option>
+              </select>
+            </label>
+          </div>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {isLoading && (
+              <button
+                type="button"
+                onClick={onStopConsultation}
+                className="rounded-xl border border-red-500/70 bg-red-950/50 px-5 py-2.5 font-medium text-red-100 hover:bg-red-900/60"
+              >
+                Stop
+              </button>
+            )}
             <button
-              type="button"
-              onClick={onStopConsultation}
-              className="order-first rounded-xl border border-red-500/70 bg-red-950/50 px-6 py-3 font-medium text-red-100 hover:bg-red-900/60 sm:order-none"
+              type="submit"
+              disabled={isLoading || !input.trim()}
+              className="rounded-xl bg-[var(--accent)] px-6 py-2.5 font-medium text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)] disabled:opacity-50"
             >
-              Stop
+              {isLoading ? 'Consulting...' : 'Send'}
             </button>
-          )}
-          <button
-            type="submit"
-            disabled={isLoading || !input.trim()}
-            className="rounded-xl bg-[var(--accent)] px-6 py-3 font-medium text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)] disabled:opacity-50"
-          >
-            {isLoading ? 'Consulting...' : 'Send'}
-          </button>
+          </div>
         </div>
       </form>
     </div>

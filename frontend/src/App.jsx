@@ -7,6 +7,27 @@ import Settings from './pages/Settings';
 import ModelManager from './pages/ModelManager';
 import { api } from './api';
 
+const SIDEBAR_WIDTH_KEY = 'tinylm.sidebarWidth';
+const SIDEBAR_WIDTH_DEFAULT = 288;
+const SIDEBAR_WIDTH_MIN = 220;
+const SIDEBAR_WIDTH_MAX = 420;
+
+function clampSidebarWidth(value) {
+  return Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, value));
+}
+
+function readStoredSidebarWidth() {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+    if (raw == null) return SIDEBAR_WIDTH_DEFAULT;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) return SIDEBAR_WIDTH_DEFAULT;
+    return clampSidebarWidth(parsed);
+  } catch {
+    return SIDEBAR_WIDTH_DEFAULT;
+  }
+}
+
 export default function App() {
   const [conversations, setConversations] = useState([]);
   const [currentConversationId, setCurrentConversationId] = useState(null);
@@ -16,11 +37,13 @@ export default function App() {
   const [settings, setSettings] = useState(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(readStoredSidebarWidth);
   const abortControllerRef = useRef(null);
   const streamingConversationIdRef = useRef(null);
   const currentConversationIdRef = useRef(null);
   const deltaBufferRef = useRef({});
   const deltaRafRef = useRef(null);
+  const sidebarWidthRef = useRef(sidebarWidth);
 
   const clearDeltaPipeline = () => {
     deltaBufferRef.current = {};
@@ -28,6 +51,51 @@ export default function App() {
       cancelAnimationFrame(deltaRafRef.current);
       deltaRafRef.current = null;
     }
+  };
+
+  useEffect(() => {
+    sidebarWidthRef.current = sidebarWidth;
+  }, [sidebarWidth]);
+
+  const handleSidebarResizeStart = (event) => {
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+      return;
+    }
+    event.preventDefault();
+    const handle = event.currentTarget;
+    const pointerId = event.pointerId;
+    handle.setPointerCapture?.(pointerId);
+
+    const previousUserSelect = document.body.style.userSelect;
+    const previousCursor = document.body.style.cursor;
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+    document.body.classList.add('sidebar-resizing');
+
+    const onMove = (moveEvent) => {
+      const next = clampSidebarWidth(moveEvent.clientX);
+      sidebarWidthRef.current = next;
+      setSidebarWidth(next);
+    };
+
+    const onEnd = () => {
+      handle.releasePointerCapture?.(pointerId);
+      handle.removeEventListener('pointermove', onMove);
+      handle.removeEventListener('pointerup', onEnd);
+      handle.removeEventListener('pointercancel', onEnd);
+      document.body.style.userSelect = previousUserSelect;
+      document.body.style.cursor = previousCursor;
+      document.body.classList.remove('sidebar-resizing');
+      try {
+        localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidthRef.current));
+      } catch {
+        /* ignore quota / private mode */
+      }
+    };
+
+    handle.addEventListener('pointermove', onMove);
+    handle.addEventListener('pointerup', onEnd);
+    handle.addEventListener('pointercancel', onEnd);
   };
 
   const abortActiveStream = () => {
@@ -964,6 +1032,8 @@ export default function App() {
         onDeleteConversation={handleDeleteConversation}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        width={sidebarWidth}
+        onResizeStart={handleSidebarResizeStart}
       />
       <div className="flex min-w-0 flex-1 flex-col pt-12 md:pt-0">
       <Routes>

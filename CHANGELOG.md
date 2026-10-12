@@ -4,6 +4,11 @@ All notable changes to TinyLM Council are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Composer toolbar** — web/run/mode/members controls share one row with Stop/Send; composer max width raised for wider chats
+- **Resizable sidebar** — drag the desktop sidebar edge to free space for input and model output; width persists in localStorage
+
 ## [0.8.0] - 2026-10-11
 
 ### Added

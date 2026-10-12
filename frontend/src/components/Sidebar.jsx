@@ -8,6 +8,8 @@ export default function Sidebar({
   onDeleteConversation,
   isOpen,
   onClose,
+  width = 288,
+  onResizeStart,
 }) {
   const handleSelectConversation = (id) => {
     onSelectConversation(id);
@@ -21,9 +23,10 @@ export default function Sidebar({
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-[var(--border)] bg-[var(--panel)] transition-transform duration-200 md:relative md:z-auto md:max-w-none md:shrink-0 md:translate-x-0 ${
+      className={`fixed inset-y-0 left-0 z-50 flex max-w-[85vw] flex-col border-r border-[var(--border)] bg-[var(--panel)] transition-transform duration-200 md:relative md:z-auto md:max-w-none md:shrink-0 md:translate-x-0 ${
         isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
       }`}
+      style={{ width: `${width}px` }}
     >
       <div className="flex items-start justify-between border-b border-[var(--border)] p-4">
         <div>
@@ -120,6 +123,17 @@ export default function Sidebar({
           ))
         )}
       </div>
+
+      <div
+        className="sidebar-resize-handle"
+        role="separator"
+        aria-orientation="vertical"
+        aria-valuenow={width}
+        aria-valuemin={220}
+        aria-valuemax={420}
+        aria-label="Resize sidebar"
+        onPointerDown={onResizeStart}
+      />
     </aside>
   );
 }
