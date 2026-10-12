@@ -4,11 +4,18 @@ All notable changes to TinyLM Council are documented here.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-12
+
 ### Added
 
-- **File / code attachments** — attach text and source files to a council turn; files persist under app data and are packed into Stage 1 with Tiny/Standard budgets
-- **Image attachments** — attach png/jpeg/webp/gif; vision-capable members receive multimodal Stage 1 input (heuristic or Settings “Vision” flag); others get filenames only
-- **Attachment APIs** — `POST/GET/DELETE /api/conversations/{id}/attachments/{…}`; conversation delete removes stored files
+- **File / code attachments** — composer **Attach** adds text and source files to a council turn; files persist under app data and are packed into Stage 1 with Tiny/Standard budgets (up to 8 files, 256 KB each)
+- **Image attachments** — attach png/jpeg/webp/gif (up to 4 images, 4 MB each); vision-capable members receive multimodal Stage 1 input (model-name heuristic or Settings **Vision** flag); others get filenames only
+- **Attachment APIs** — `POST/GET/DELETE /api/conversations/{id}/attachments/{…}`; conversation delete removes stored files; failed-turn rollback cleans that turn’s uploads
+
+### Changed
+
+- **Composer toolbar** — Attach / web / run / mode / members share one row with Stop/Send; composer max width raised for wider chats
+- **Resizable sidebar** — drag the desktop sidebar edge to free space for input and model output; width persists in localStorage
 
 ## [0.8.0] - 2026-10-11
 
@@ -154,6 +161,7 @@ All notable changes to TinyLM Council are documented here.
 - Windows launcher (`start.ps1`)
 - LM Studio council reliability improvements
 
+[0.9.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.9.0
 [0.8.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.8.0
 [0.7.1]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.7.1
 [0.7.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.7.0

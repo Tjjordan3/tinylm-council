@@ -57,6 +57,12 @@ Same as the web app:
 
 See [WINDOWS_SETUP.md](WINDOWS_SETUP.md) for provider tips, Tailscale phone access (via the classic browser launcher), and troubleshooting.
 
+## What’s new in v0.9.0+
+
+- **Attachments** — composer **Attach** adds text/code files and images to a turn. Text/code is packed into Stage 1 (up to 8 files, 256 KB each). Images (up to 4, 4 MB each) go to vision-capable members; mark **Vision** on a member in Settings or use a vision model name. Attachments persist with the chat and are removed when you delete it. See [WINDOWS_SETUP.md — Attachments](WINDOWS_SETUP.md#attachments).
+- **Composer toolbar** — Attach, web/run/mode/members, and Send share one control row.
+- **Resizable sidebar** — drag the sidebar edge to give more room to answers and the composer; width is remembered.
+
 ## What’s new in v0.8.0+
 
 - **Streaming answers** — Stage 1, peer review/debate, and the chairman write into the UI as tokens arrive.
@@ -64,7 +70,6 @@ See [WINDOWS_SETUP.md](WINDOWS_SETUP.md) for provider tips, Tailscale phone acce
 - **Max members** — limit a run to 2–4 enabled models from the composer.
 - **Regenerate chairman** — on a finished answer, re-run Stage 3 only (reuses stored Stage 1 / debate).
 - **Stop** cancels in-flight work and frees the council for the next question.
-- **Attachments** — composer **Attach** adds text/code files (and images). Text/code is packed into Stage 1 (limits: 8 files, 256 KB each). Images go to vision-capable members; mark **Vision** on a member in Settings or use a vision model name. Attachments persist with the chat.
 
 ## Debate mode (summary)
 

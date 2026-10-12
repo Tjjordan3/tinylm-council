@@ -183,11 +183,30 @@ Use this when you want models to argue before a final consensus, instead of only
 - **Regenerate chairman** — on a finished reply, **Regenerate chairman** re-runs Stage 3 only (keeps Stage 1 / deliberation).
 - **Deliberation mode** — see [Debate mode (summary)](#debate-mode-summary) above; ranked peer review is the default.
 - **Empty chat** — type in the composer with no conversation selected; a new chat is created on Send.
-- **Attach files** — use **Attach** for source/text files (and images). Caps: 8 text files (256 KB each) and 4 images (4 MB each) per message. Text is injected into Stage 1 under a Tiny/Standard budget. Images are sent only to vision-capable models (auto-detect or Settings → member **Vision**). Files are stored with the conversation and removed when the chat is deleted.
+- **Attachments** (v0.9.0+) — see [Attachments](#attachments) below.
+- **Resizable sidebar** (desktop v0.9.0+) — drag the right edge of the sidebar to widen the chat pane; width is remembered.
 - **One at a time** — wait for a run to finish (or stop it) before sending another question.
 - **Failed models** — one bad model does not stop the council; remove unreliable models in Settings.
 - **Web search** — check **Search the web first** before sending; add your Serper key in **Settings → Web search** or in `.env` ([serper.dev](https://serper.dev), ~2,500 free searches/month). Sources show in the **Web sources** panel. Council still runs if the key is missing (with a warning). Optional **Skip search when not needed** in Settings uses a small heuristic when the toggle is on.
 - **Delete chats** — hover a conversation in the sidebar and click **×** (always visible on mobile).
+
+## Attachments
+
+From **v0.9.0**, the composer **Attach** control can include files with a council question.
+
+| Kind | Examples | Per-message limits | Behavior |
+|------|----------|--------------------|----------|
+| Text / code | `.py`, `.js`, `.ts`, `.md`, `.json`, `.rs`, `.go`, … | **8** files, **256 KB** each | Packed into Stage 1 prompts (Tiny packs tighter than Standard) |
+| Images | png, jpeg, webp, gif | **4** images, **4 MB** each | Vision-capable members get multimodal input; others see filenames only |
+
+**Tips**
+
+- Attach before Send; chips appear above the text box (remove with **×**).
+- Empty chat: a conversation is created on Send so uploads have a place to live, then the council runs.
+- **Vision:** enable Settings → council member → **Vision**, or use a model name that implies vision (e.g. `llava`, `gpt-4o`, `qwen2-vl`). Without a vision member, images are still attached but only referenced by name for text models.
+- Files are stored under the app data directory with the conversation and deleted when you delete that chat.
+- A failed/cancelled run rolls back that turn’s uploads so the chat does not keep orphan files from an incomplete Send.
+- Good for coding questions with the **Mini coding council** preset: attach the files you want reviewed, then ask.
 
 ### NVIDIA NIM (optional cloud models)
 

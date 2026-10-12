@@ -13,9 +13,9 @@ Get the Windows desktop installer from GitHub Releases:
 | `TinyLM-Council-Windows-Setup.exe` | Windows 10/11 (NSIS installer) |
 | `TinyLM-Council-<version>-Windows-Setup.exe` | Same build, versioned filename |
 
-**Latest:** `v0.8.0` — streaming answers, Quick mode, and a refreshed UI. Download `TinyLM-Council-Windows-Setup.exe` or `TinyLM-Council-0.8.0-Windows-Setup.exe`.
+**Latest:** `v0.9.0` — file/code and image attachments, plus composer/sidebar layout polish. Download `TinyLM-Council-Windows-Setup.exe` or `TinyLM-Council-0.9.0-Windows-Setup.exe`.
 
-Install Ollama or LM Studio separately, then launch **TinyLM Council** from the Start menu. Details: **[docs/WINDOWS_DESKTOP.md](docs/WINDOWS_DESKTOP.md)**. Debate walkthrough: **[docs/WINDOWS_SETUP.md#debate-mode-summary](docs/WINDOWS_SETUP.md#debate-mode-summary)**.
+Install Ollama or LM Studio separately, then launch **TinyLM Council** from the Start menu. Details: **[docs/WINDOWS_DESKTOP.md](docs/WINDOWS_DESKTOP.md)**. Debate walkthrough: **[docs/WINDOWS_SETUP.md#debate-mode-summary](docs/WINDOWS_SETUP.md#debate-mode-summary)**. Attachments: **[docs/WINDOWS_SETUP.md#attachments](docs/WINDOWS_SETUP.md#attachments)**.
 
 Release notes: [CHANGELOG.md](CHANGELOG.md).
 
@@ -29,11 +29,22 @@ Release notes: [CHANGELOG.md](CHANGELOG.md).
 
 ## How it works
 
-1. **Stage 1 — First opinions:** Your question goes to all council members in parallel.
+1. **Stage 1 — First opinions:** Your question (plus optional **attached files/images** and web search) goes to all council members in parallel.
 2. **Stage 2 — Deliberation** (choose in Settings or per message), or **Quick mode** to skip this stage:
    - **Ranked peer review** (default): each member anonymously ranks the others' answers.
    - **Debate:** members rebut each other for 1–3 rounds (early-exit if they converge), then revise their positions.
 3. **Stage 3 — Final answer:** The chairman compiles everything into one consensus response (streams live in the UI).
+
+### Attachments (v0.9.0+)
+
+Use **Attach** in the composer to add source/text files or images to a turn:
+
+| Kind | Limits | What the council sees |
+|------|--------|------------------------|
+| Text / code (`.py`, `.md`, `.ts`, …) | Up to **8** files, **256 KB** each | Packed into Stage 1 under a Tiny/Standard token budget |
+| Images (png/jpeg/webp/gif) | Up to **4** images, **4 MB** each | Sent as vision input only to **vision-capable** members; others get filenames |
+
+Attachments **persist with the conversation** (under app data) and are removed when you delete the chat. Mark a member **Vision** in Settings, or use a model whose name implies vision (e.g. `llava`, `gpt-4o`). Full notes: [docs/WINDOWS_SETUP.md#attachments](docs/WINDOWS_SETUP.md#attachments).
 
 ## Tiny vs Standard profile
 
