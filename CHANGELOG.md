@@ -4,6 +4,10 @@ All notable changes to TinyLM Council are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Debate rounds 1–5** — Settings and API accept up to five debate rounds (was 1–3); early convergence still stops the loop and surfaces `debate_early_exit` / a “Converged early” badge in the UI
+
 ## [0.9.0] - 2026-10-12
 
 ### Added

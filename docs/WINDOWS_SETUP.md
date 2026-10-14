@@ -159,17 +159,17 @@ Use this when you want models to argue before a final consensus, instead of only
 | Step | What happens |
 |------|----------------|
 | **1. First opinions** | Every enabled member answers your question (same as ranked mode). |
-| **2. Debate rounds** | For 1–3 rounds, each member sees the others’ anonymized answers, challenges errors, concedes good points, and revises its position. |
+| **2. Debate rounds** | For 1–5 rounds, each member sees the others’ anonymized answers, challenges errors, concedes good points, and revises its position. Extra rounds stop early when positions converge. |
 | **3. Chairman** | The chairman reads the initial answers plus the debate transcript and writes one consensus reply. |
 
 **How to turn it on**
 
-1. **Settings → Council profile → Deliberation mode → Debate** (set rounds 1–3), then **Save changes**, or  
+1. **Settings → Council profile → Deliberation mode → Debate** (set rounds 1–5), then **Save changes**, or  
 2. In the chat composer, set **Mode** to **Debate** for a single message (does not require changing Settings).
 
 **Tips**
 
-- Start with **1 round** on Tiny / small local models; use 2 on Standard or stronger models.
+- Start with **1 round** on Tiny / small local models; use 2–3 on Standard or stronger models (up to 5 if you want more room to converge).
 - You still need at least **2 enabled members** plus a **chairman**.
 - Ranked peer review remains the default; switch back anytime in Settings or the composer Mode control.
 - Desktop app **v0.7.1+**: if Debate snaps back to Ranked after Save, quit the app and stop any old backend on port **8001** (`start.ps1`), then reopen the installer build (desktop API uses port **18765**).

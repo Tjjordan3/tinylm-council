@@ -197,7 +197,7 @@ def settings_from_dict(data: Dict[str, Any]) -> AppSettings:
         rounds = int(data.get("debate_rounds", 1))
     except (TypeError, ValueError):
         rounds = 1
-    rounds = max(1, min(3, rounds))
+    rounds = max(1, min(5, rounds))
     run_mode = (data.get("default_run_mode") or "full").strip().lower()
     if run_mode not in ("full", "quick"):
         run_mode = "full"
@@ -269,7 +269,7 @@ def update_settings(data: Dict[str, Any]) -> AppSettings:
             rounds = int(data["debate_rounds"])
         except (TypeError, ValueError):
             rounds = current.debate_rounds
-        current.debate_rounds = max(1, min(3, rounds))
+        current.debate_rounds = max(1, min(5, rounds))
     if "setup_complete" in data:
         current.setup_complete = data["setup_complete"]
     if "serper_api_key" in data:

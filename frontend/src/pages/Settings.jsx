@@ -373,7 +373,7 @@ export default function Settings({ settings: initialSettings, onSave }) {
                 }
                 className="mt-1 block rounded-lg border border-gray-700 bg-[#0f1117] px-3 py-2 text-gray-200"
               >
-                {[1, 2, 3].map((n) => (
+                {[1, 2, 3, 4, 5].map((n) => (
                   <option key={n} value={n}>
                     {n}
                   </option>

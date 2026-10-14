@@ -32,7 +32,7 @@ Release notes: [CHANGELOG.md](CHANGELOG.md).
 1. **Stage 1 — First opinions:** Your question (plus optional **attached files/images** and web search) goes to all council members in parallel.
 2. **Stage 2 — Deliberation** (choose in Settings or per message), or **Quick mode** to skip this stage:
    - **Ranked peer review** (default): each member anonymously ranks the others' answers.
-   - **Debate:** members rebut each other for 1–3 rounds (early-exit if they converge), then revise their positions.
+   - **Debate:** members rebut each other for 1–5 rounds (early-exit if they converge), then revise their positions.
 3. **Stage 3 — Final answer:** The chairman compiles everything into one consensus response (streams live in the UI).
 
 ### Attachments (v0.9.0+)

@@ -657,11 +657,11 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
         mode = "quick"
     if request.debate_rounds is not None:
         try:
-            rounds = max(1, min(3, int(request.debate_rounds)))
+            rounds = max(1, min(5, int(request.debate_rounds)))
         except (TypeError, ValueError):
             rounds = settings.debate_rounds or 1
     else:
-        rounds = max(1, min(3, int(settings.debate_rounds or 1)))
+        rounds = max(1, min(5, int(settings.debate_rounds or 1)))
 
     enabled = settings.get_enabled_members()
     chairman = settings.get_chairman()
@@ -908,6 +908,7 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                 label_to_model: Dict[str, str] = {}
                 ranking_parse_failed = False
                 aggregate_rankings: List[dict] = []
+                debate_early_exit = False
 
                 if run_mode == "quick":
                     yield f"data: {json.dumps({'type': 'stage2_skipped', 'reason': 'quick_mode'})}\n\n"
@@ -954,8 +955,8 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                         elif kind == "keepalive":
                             yield ": keepalive\n\n"
                         else:
-                            debate_rounds_data, label_to_model = payload
-                    yield f"data: {json.dumps({'type': 'debate_complete', 'data': debate_rounds_data, 'metadata': {'label_to_model': label_to_model, 'deliberation_mode': 'debate', 'debate_rounds_count': len(debate_rounds_data)}})}\n\n"
+                            debate_rounds_data, label_to_model, debate_early_exit = payload
+                    yield f"data: {json.dumps({'type': 'debate_complete', 'data': debate_rounds_data, 'metadata': {'label_to_model': label_to_model, 'deliberation_mode': 'debate', 'debate_rounds_count': len(debate_rounds_data), 'debate_early_exit': debate_early_exit}})}\n\n"
                 else:
                     yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
                     rank_queue: asyncio.Queue = asyncio.Queue()
@@ -1046,6 +1047,7 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                     "deliberation_mode": "rank" if mode == "quick" else mode,
                     "run_mode": run_mode,
                     "debate_rounds_count": len(debate_rounds_data),
+                    "debate_early_exit": debate_early_exit,
                     "failed_members": [
                         r.get("display_name")
                         for r in all_stage1

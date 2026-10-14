@@ -78,7 +78,7 @@ From **v0.7.0**, the desktop app includes **Debate** deliberation alongside rank
 | Step | What happens |
 |------|----------------|
 | **1. First opinions** | Each council member answers your question. |
-| **2. Debate** | Members rebut each other for 1–3 anonymized rounds and revise their answers. |
+| **2. Debate** | Members rebut each other for 1–5 anonymized rounds and revise their answers (stops early if they converge). |
 | **3. Final answer** | The chairman synthesizes a consensus from the initials + debate. |
 
 Enable it under **Settings → Deliberation mode → Debate**, or use the chat **Mode** dropdown for one message. Full notes: [WINDOWS_SETUP.md — Debate mode](WINDOWS_SETUP.md#debate-mode-summary).

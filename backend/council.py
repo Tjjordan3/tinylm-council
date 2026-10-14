@@ -386,9 +386,9 @@ async def stage2_run_debate_rounds(
     web_context: str = "",
     on_member_complete: Optional[Callable[[int, Dict[str, Any]], None]] = None,
     on_delta: Optional[Callable[[int, str, str], None]] = None,
-) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
-    """Run structured anonymized debate rounds; returns (rounds, label_to_model)."""
-    rounds_count = max(1, min(3, int(debate_rounds or 1)))
+) -> Tuple[List[Dict[str, Any]], Dict[str, str], bool]:
+    """Run structured anonymized debate rounds; returns (rounds, label_to_model, early_exit)."""
+    rounds_count = max(1, min(5, int(debate_rounds or 1)))
     positions = {
         result["member_id"]: {
             "member_id": result["member_id"],
@@ -401,7 +401,7 @@ async def stage2_run_debate_rounds(
         if result.get("success") and result.get("member_id")
     }
     if len(positions) < 2:
-        return [], {}
+        return [], {}, False
 
     ordered_ids = [result["member_id"] for result in stage1_results if result["member_id"] in positions]
     labels = [chr(65 + i) for i in range(len(ordered_ids))]
@@ -415,6 +415,7 @@ async def stage2_run_debate_rounds(
 
     member_by_id = {member.id: member for member in members}
     debate_history: List[Dict[str, Any]] = []
+    early_exit = False
 
     for round_number in range(1, rounds_count + 1):
         async def debate_member(
@@ -499,9 +500,10 @@ async def stage2_run_debate_rounds(
                 if (positions[mid].get("response") or "").strip()
             ]
             if positions_converged(texts):
+                early_exit = True
                 break
 
-    return debate_history, label_to_model
+    return debate_history, label_to_model, early_exit
 
 
 async def stage3_synthesize_final(
@@ -707,9 +709,10 @@ async def run_full_council(
     label_to_model: Dict[str, str] = {}
     ranking_parse_failed = False
     aggregate_rankings: List[Dict[str, Any]] = []
+    debate_early_exit = False
 
     if mode == "debate":
-        debate_rounds_data, label_to_model = await stage2_run_debate_rounds(
+        debate_rounds_data, label_to_model, debate_early_exit = await stage2_run_debate_rounds(
             registry,
             members,
             user_query,
@@ -735,6 +738,8 @@ async def run_full_council(
             "ranking_parse_failed": ranking_parse_failed,
             "deliberation_mode": mode,
             "debate_rounds": debate_rounds_data,
+            "debate_early_exit": debate_early_exit,
+            "debate_rounds_count": len(debate_rounds_data),
         }
 
     stage3_result = await stage3_synthesize_final(
@@ -756,6 +761,7 @@ async def run_full_council(
         "council_profile": profile,
         "deliberation_mode": mode,
         "debate_rounds_count": len(debate_rounds_data),
+        "debate_early_exit": debate_early_exit,
         "failed_members": [
             result.get("display_name")
             for result in all_stage1

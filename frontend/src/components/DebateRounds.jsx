@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown';
 export default function DebateRounds({
   rounds,
   labelToModel,
+  earlyExit = false,
   defaultCollapsed = false,
 }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
@@ -28,8 +29,13 @@ export default function DebateRounds({
         onClick={() => setCollapsed(!collapsed)}
         className="flex w-full items-center justify-between px-4 py-3 text-left"
       >
-        <span className="font-medium text-gray-200">
+        <span className="flex flex-wrap items-center gap-2 font-medium text-gray-200">
           Stage 2: Debate ({rounds.length} round{rounds.length === 1 ? '' : 's'})
+          {earlyExit && (
+            <span className="rounded bg-emerald-900/50 px-2 py-0.5 text-xs font-normal text-emerald-300">
+              Converged early
+            </span>
+          )}
         </span>
         <span className="text-gray-500">{collapsed ? 'Show' : 'Hide'}</span>
       </button>
@@ -39,6 +45,9 @@ export default function DebateRounds({
           <p className="mt-3 text-sm text-gray-400">
             Members rebutted each other anonymously, then revised their positions. Labels are
             shown with model names for readability.
+            {earlyExit
+              ? ' Debate stopped early once positions agreed closely enough.'
+              : ''}
           </p>
 
           <div className="mt-3 flex flex-wrap gap-2">

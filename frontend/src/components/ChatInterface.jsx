@@ -385,6 +385,7 @@ export default function ChatInterface({
                       deliberationMode={mode}
                       runMode={run}
                       stageStartedAt={msg.stageStartedAt}
+                      debateEarlyExit={!!msg.metadata?.debate_early_exit}
                     />
 
                     <WebSources
@@ -403,6 +404,7 @@ export default function ChatInterface({
                         <DebateRounds
                           rounds={debateRounds}
                           labelToModel={msg.metadata?.label_to_model}
+                          earlyExit={!!msg.metadata?.debate_early_exit}
                           defaultCollapsed={!!msg.stage3 && !msg.loading?.stage3}
                         />
                       ) : (

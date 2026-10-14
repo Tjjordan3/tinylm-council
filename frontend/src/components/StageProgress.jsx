@@ -15,10 +15,14 @@ export default function StageProgress({
   deliberationMode = 'rank',
   runMode = 'full',
   stageStartedAt,
+  debateEarlyExit = false,
 }) {
   const mode = deliberationMode === 'debate' ? 'debate' : 'rank';
   const quick = runMode === 'quick';
-  const middleLabel = quick ? 'Skipped' : mode === 'debate' ? 'Debate' : 'Peer review';
+  let middleLabel = quick ? 'Skipped' : mode === 'debate' ? 'Debate' : 'Peer review';
+  if (!quick && mode === 'debate' && debateEarlyExit && stage2Done) {
+    middleLabel = 'Debate (converged)';
+  }
   const stages = [
     { key: 'stage1', label: 'First opinions', active: loading?.stage1, done: stage1Done },
     {
