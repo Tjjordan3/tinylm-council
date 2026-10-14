@@ -612,6 +612,7 @@ export default function App() {
         stage2: null,
         stage3: null,
         debateRounds: null,
+        sharedDraftRounds: null,
         metadata: { deliberation_mode: deliberationMode },
         webSearch: null,
         memberStatuses: {},
@@ -620,6 +621,7 @@ export default function App() {
           stage1: false,
           stage2: false,
           debate: false,
+          draft: false,
           stage3: false,
         },
       };
@@ -795,6 +797,7 @@ export default function App() {
                   ...(prev.messages[prev.messages.length - 1].loading || {}),
                   stage2: false,
                   debate: false,
+                  draft: false,
                 },
               })
             );
@@ -892,6 +895,106 @@ export default function App() {
                 loading: {
                   ...(prev.messages[prev.messages.length - 1].loading || {}),
                   debate: false,
+                },
+              })
+            );
+            break;
+          case 'draft_start':
+            applyStreamUpdate(conversationId, (prev) =>
+              updateLastAssistantMessage(prev, {
+                sharedDraftRounds: [],
+                loading: {
+                  ...(prev.messages[prev.messages.length - 1].loading || {}),
+                  draft: true,
+                  stage2: false,
+                  debate: false,
+                },
+                metadata: {
+                  ...(prev.messages[prev.messages.length - 1].metadata || {}),
+                  deliberation_mode: 'draft',
+                },
+                stageStartedAt: {
+                  ...(prev.messages[prev.messages.length - 1].stageStartedAt || {}),
+                  stage2: Date.now(),
+                },
+              })
+            );
+            break;
+          case 'draft_member_complete': {
+            const data = event.data;
+            const roundNum = event.round;
+            applyStreamUpdate(conversationId, (prev) => {
+              const lastMsg = prev.messages[prev.messages.length - 1];
+              const existing = [...(lastMsg.sharedDraftRounds || [])];
+              let roundEntry = existing.find((r) => r.round === roundNum);
+              if (!roundEntry) {
+                roundEntry = { round: roundNum, draft: '', edits: [] };
+                existing.push(roundEntry);
+                existing.sort((a, b) => a.round - b.round);
+              }
+              const edits = [...(roundEntry.edits || [])];
+              const idx = edits.findIndex((r) => r.member_id === data.member_id);
+              if (idx >= 0) edits[idx] = data;
+              else edits.push(data);
+              roundEntry = { ...roundEntry, edits };
+              const nextRounds = existing.map((r) =>
+                r.round === roundNum ? roundEntry : r
+              );
+              return updateLastAssistantMessage(prev, {
+                sharedDraftRounds: nextRounds,
+                memberStatuses: {
+                  ...(lastMsg.memberStatuses || {}),
+                  [data.member_id]: {
+                    ...(lastMsg.memberStatuses?.[data.member_id] || {}),
+                    display_name: data.display_name,
+                    model: data.model,
+                    status: data.success ? 'done' : 'failed',
+                    error: data.error,
+                  },
+                },
+              });
+            });
+            break;
+          }
+          case 'draft_round_complete': {
+            const roundNum = event.round;
+            const roundData = event.data || {
+              round: roundNum,
+              draft: event.draft || '',
+              edits: [],
+            };
+            applyStreamUpdate(conversationId, (prev) => {
+              const lastMsg = prev.messages[prev.messages.length - 1];
+              const existing = [...(lastMsg.sharedDraftRounds || [])];
+              const idx = existing.findIndex((r) => r.round === roundNum);
+              if (idx >= 0) {
+                existing[idx] = {
+                  ...existing[idx],
+                  ...roundData,
+                  edits: roundData.edits || existing[idx].edits || [],
+                };
+              } else {
+                existing.push(roundData);
+                existing.sort((a, b) => a.round - b.round);
+              }
+              return updateLastAssistantMessage(prev, {
+                sharedDraftRounds: existing,
+              });
+            });
+            break;
+          }
+          case 'draft_complete':
+            applyStreamUpdate(conversationId, (prev) =>
+              updateLastAssistantMessage(prev, {
+                sharedDraftRounds: event.data,
+                metadata: {
+                  ...(prev.messages[prev.messages.length - 1].metadata || {}),
+                  ...(event.metadata || {}),
+                  deliberation_mode: 'draft',
+                },
+                loading: {
+                  ...(prev.messages[prev.messages.length - 1].loading || {}),
+                  draft: false,
                 },
               })
             );

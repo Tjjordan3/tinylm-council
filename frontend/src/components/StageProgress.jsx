@@ -16,19 +16,34 @@ export default function StageProgress({
   runMode = 'full',
   stageStartedAt,
   debateEarlyExit = false,
+  draftEarlyExit = false,
 }) {
-  const mode = deliberationMode === 'debate' ? 'debate' : 'rank';
+  const mode =
+    deliberationMode === 'debate'
+      ? 'debate'
+      : deliberationMode === 'draft'
+        ? 'draft'
+        : 'rank';
   const quick = runMode === 'quick';
-  let middleLabel = quick ? 'Skipped' : mode === 'debate' ? 'Debate' : 'Peer review';
+  let middleLabel = quick
+    ? 'Skipped'
+    : mode === 'debate'
+      ? 'Debate'
+      : mode === 'draft'
+        ? 'Joint draft'
+        : 'Peer review';
   if (!quick && mode === 'debate' && debateEarlyExit && stage2Done) {
     middleLabel = 'Debate (converged)';
+  }
+  if (!quick && mode === 'draft' && draftEarlyExit && stage2Done) {
+    middleLabel = 'Joint draft (stable)';
   }
   const stages = [
     { key: 'stage1', label: 'First opinions', active: loading?.stage1, done: stage1Done },
     {
       key: 'stage2',
       label: middleLabel,
-      active: !quick && (loading?.stage2 || loading?.debate),
+      active: !quick && (loading?.stage2 || loading?.debate || loading?.draft),
       done: quick ? stage1Done : stage2Done,
       skipped: quick,
     },
@@ -41,7 +56,7 @@ export default function StageProgress({
     if (!anyActive) return undefined;
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [loading?.stage1, loading?.stage2, loading?.debate, loading?.stage3]);
+  }, [loading?.stage1, loading?.stage2, loading?.debate, loading?.draft, loading?.stage3]);
 
   const activeKey = stages.find((s) => s.active)?.key;
   const started =
