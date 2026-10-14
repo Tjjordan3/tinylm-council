@@ -57,6 +57,11 @@ Same as the web app:
 
 See [WINDOWS_SETUP.md](WINDOWS_SETUP.md) for provider tips, Tailscale phone access (via the classic browser launcher), and troubleshooting.
 
+## What’s new in v0.10.0+
+
+- **Joint draft** — new deliberation mode that iterates one shared answer (peer suggestions + editor merge) before the chairman finalizes. Settings or composer **Mode → Joint draft**; rounds 1–5 with early-exit when the draft stabilizes. See [Joint draft mode](WINDOWS_SETUP.md#joint-draft-mode-summary).
+- **Stronger Debate converge** — debate rounds raised to **1–5**; stops early when positions agree and shows a **Converged early** badge. See [Debate mode](WINDOWS_SETUP.md#debate-mode-summary).
+
 ## What’s new in v0.9.0+
 
 - **Attachments** — composer **Attach** adds text/code files and images to a turn. Text/code is packed into Stage 1 (up to 8 files, 256 KB each). Images (up to 4, 4 MB each) go to vision-capable members; mark **Vision** on a member in Settings or use a vision model name. Attachments persist with the chat and are removed when you delete it. See [WINDOWS_SETUP.md — Attachments](WINDOWS_SETUP.md#attachments).
@@ -78,10 +83,22 @@ From **v0.7.0**, the desktop app includes **Debate** deliberation alongside rank
 | Step | What happens |
 |------|----------------|
 | **1. First opinions** | Each council member answers your question. |
-| **2. Debate** | Members rebut each other for 1–3 anonymized rounds and revise their answers. |
+| **2. Debate** | Members rebut each other for 1–5 anonymized rounds and revise their answers (stops early if they converge). |
 | **3. Final answer** | The chairman synthesizes a consensus from the initials + debate. |
 
 Enable it under **Settings → Deliberation mode → Debate**, or use the chat **Mode** dropdown for one message. Full notes: [WINDOWS_SETUP.md — Debate mode](WINDOWS_SETUP.md#debate-mode-summary).
+
+## Joint draft mode (summary)
+
+**Joint draft** iterates one shared answer before the chairman finalizes.
+
+| Step | What happens |
+|------|----------------|
+| **1. First opinions** | Members write candidate drafts. |
+| **2. Joint draft** | For 1–5 rounds, peers suggest revisions; an editor merges them into the next shared draft (stops early if it stabilizes). |
+| **3. Final answer** | The chairman polishes the shared draft. |
+
+Enable under **Settings → Deliberation mode → Joint draft**, or composer **Mode → Joint draft**. Details: [WINDOWS_SETUP.md — Joint draft](WINDOWS_SETUP.md#joint-draft-mode-summary).
 
 ## Develop the desktop app
 

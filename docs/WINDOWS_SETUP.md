@@ -159,20 +159,40 @@ Use this when you want models to argue before a final consensus, instead of only
 | Step | What happens |
 |------|----------------|
 | **1. First opinions** | Every enabled member answers your question (same as ranked mode). |
-| **2. Debate rounds** | For 1–3 rounds, each member sees the others’ anonymized answers, challenges errors, concedes good points, and revises its position. |
+| **2. Debate rounds** | For 1–5 rounds, each member sees the others’ anonymized answers, challenges errors, concedes good points, and revises its position. Extra rounds stop early when positions converge. |
 | **3. Chairman** | The chairman reads the initial answers plus the debate transcript and writes one consensus reply. |
 
 **How to turn it on**
 
-1. **Settings → Council profile → Deliberation mode → Debate** (set rounds 1–3), then **Save changes**, or  
+1. **Settings → Council profile → Deliberation mode → Debate** (set rounds 1–5), then **Save changes**, or  
 2. In the chat composer, set **Mode** to **Debate** for a single message (does not require changing Settings).
 
 **Tips**
 
-- Start with **1 round** on Tiny / small local models; use 2 on Standard or stronger models.
+- Start with **1 round** on Tiny / small local models; use 2–3 on Standard or stronger models (up to 5 if you want more room to converge).
 - You still need at least **2 enabled members** plus a **chairman**.
 - Ranked peer review remains the default; switch back anytime in Settings or the composer Mode control.
 - Desktop app **v0.7.1+**: if Debate snaps back to Ranked after Save, quit the app and stop any old backend on port **8001** (`start.ps1`), then reopen the installer build (desktop API uses port **18765**).
+
+## Joint draft mode (summary)
+
+Use this when you want one evolving answer instead of ranked scores or open debate.
+
+| Step | What happens |
+|------|----------------|
+| **1. First opinions** | Members write candidate drafts (Stage 1 nudges a draft-style answer). |
+| **2. Shared draft rounds** | For 1–5 rounds, each member suggests a revision of the current shared draft; the **editor** (chairman if they answered Stage 1, otherwise the first successful member) merges suggestions into the next draft. Stops early when consecutive drafts converge. |
+| **3. Chairman** | The chairman **edits and finalizes** the latest shared draft (does not rewrite from scratch). |
+
+**How to turn it on**
+
+1. **Settings → Council profile → Deliberation mode → Joint draft** (set rounds 1–5), then **Save changes**, or  
+2. In the chat composer, set **Mode** to **Joint draft** for a single message.
+
+**Tips**
+
+- Quick mode still skips Stage 2 entirely (no draft rounds).
+- Reloading a chat restores the shared draft history from the saved assistant message.
 
 ## Using the app
 
@@ -181,7 +201,7 @@ Use this when you want models to argue before a final consensus, instead of only
 - **Quick answer** — composer **Run → Quick (skip deliberation)** goes Stage 1 → chairman only. Defaults live under **Settings → Run defaults**.
 - **Members** — composer can cap a run to 2–4 enabled models (or use all enabled).
 - **Regenerate chairman** — on a finished reply, **Regenerate chairman** re-runs Stage 3 only (keeps Stage 1 / deliberation).
-- **Deliberation mode** — see [Debate mode (summary)](#debate-mode-summary) above; ranked peer review is the default.
+- **Deliberation mode** — see [Debate mode](#debate-mode-summary) and [Joint draft mode](#joint-draft-mode-summary); ranked peer review is the default.
 - **Empty chat** — type in the composer with no conversation selected; a new chat is created on Send.
 - **Attachments** (v0.9.0+) — see [Attachments](#attachments) below.
 - **Resizable sidebar** (desktop v0.9.0+) — drag the right edge of the sidebar to widen the chat pane; width is remembered.

@@ -218,11 +218,11 @@ export default function Settings({ settings: initialSettings, onSave }) {
       if (saved && typeof saved === 'object') {
         setSettings((prev) => ({ ...prev, ...saved }));
         if (
-          wantedMode === 'debate' &&
-          saved.deliberation_mode !== 'debate'
+          (wantedMode === 'debate' || wantedMode === 'draft') &&
+          saved.deliberation_mode !== wantedMode
         ) {
           alert(
-            'Debate mode did not persist. The app may be talking to an old backend on port 8001.\n\n' +
+            `${wantedMode === 'draft' ? 'Joint draft' : 'Debate'} mode did not persist. The app may be talking to an old backend on port 8001.\n\n` +
               'Close any start.ps1 / browser TinyLM Council servers, fully quit this app, then reopen the desktop app (v0.7.1+ uses port 18765).'
           );
           return;
@@ -234,6 +234,16 @@ export default function Settings({ settings: initialSettings, onSave }) {
         ) {
           alert(
             'This backend does not support Debate mode. Update to the latest desktop installer from GitHub Releases.'
+          );
+          return;
+        }
+        if (
+          Array.isArray(saved.features) &&
+          wantedMode === 'draft' &&
+          !saved.features.includes('draft')
+        ) {
+          alert(
+            'This backend does not support Joint draft mode. Update to the latest desktop installer from GitHub Releases.'
           );
           return;
         }
@@ -326,13 +336,14 @@ export default function Settings({ settings: initialSettings, onSave }) {
 
           <h3 className="mt-6 text-base font-medium text-white">Deliberation mode</h3>
           <p className="mt-1 text-sm text-gray-400">
-            Ranked peer review anonymously scores answers. Debate lets members rebut each other
-            for a few rounds before the chairman synthesizes a consensus.
+            Ranked peer review anonymously scores answers. Debate lets members rebut each other.
+            Joint draft iterates one shared answer before the chairman finalizes.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {[
               { id: 'rank', label: 'Ranked peer review' },
               { id: 'debate', label: 'Debate' },
+              { id: 'draft', label: 'Joint draft' },
             ].map((mode) => (
               <button
                 key={mode.id}
@@ -341,7 +352,7 @@ export default function Settings({ settings: initialSettings, onSave }) {
                   setSettings((prev) => {
                     const next = { ...prev, deliberation_mode: mode.id };
                     if (
-                      mode.id === 'debate' &&
+                      (mode.id === 'debate' || mode.id === 'draft') &&
                       (prev.debate_rounds == null || prev.debate_rounds < 1)
                     ) {
                       next.debate_rounds =
@@ -360,9 +371,9 @@ export default function Settings({ settings: initialSettings, onSave }) {
               </button>
             ))}
           </div>
-          {(settings.deliberation_mode || 'rank') === 'debate' && (
+          {['debate', 'draft'].includes(settings.deliberation_mode || 'rank') && (
             <label className="mt-3 block text-sm text-gray-300">
-              Debate rounds
+              {(settings.deliberation_mode || 'rank') === 'draft' ? 'Draft rounds' : 'Debate rounds'}
               <select
                 value={settings.debate_rounds || 1}
                 onChange={(e) =>
@@ -373,7 +384,7 @@ export default function Settings({ settings: initialSettings, onSave }) {
                 }
                 className="mt-1 block rounded-lg border border-gray-700 bg-[#0f1117] px-3 py-2 text-gray-200"
               >
-                {[1, 2, 3].map((n) => (
+                {[1, 2, 3, 4, 5].map((n) => (
                   <option key={n} value={n}>
                     {n}
                   </option>
@@ -384,8 +395,8 @@ export default function Settings({ settings: initialSettings, onSave }) {
 
           <h3 className="mt-6 text-base font-medium text-white">Run defaults</h3>
           <p className="mt-1 text-sm text-gray-400">
-            Quick mode skips peer review/debate and goes Stage 1 → chairman. You can still override
-            per message in the composer.
+            Quick mode skips peer review/debate/draft and goes Stage 1 → chairman. You can still
+            override per message in the composer.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {[

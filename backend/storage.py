@@ -115,6 +115,7 @@ def add_assistant_message(
     stage3: Dict[str, Any],
     metadata: Optional[Dict[str, Any]] = None,
     debate_rounds: Optional[List[Dict[str, Any]]] = None,
+    shared_draft_rounds: Optional[List[Dict[str, Any]]] = None,
 ) -> None:
     conversation = get_conversation(conversation_id)
     if conversation is None:
@@ -127,6 +128,8 @@ def add_assistant_message(
     }
     if debate_rounds:
         message["debate_rounds"] = debate_rounds
+    if shared_draft_rounds:
+        message["shared_draft_rounds"] = shared_draft_rounds
     if metadata:
         message["metadata"] = metadata
     conversation["messages"].append(message)

@@ -13,9 +13,9 @@ Get the Windows desktop installer from GitHub Releases:
 | `TinyLM-Council-Windows-Setup.exe` | Windows 10/11 (NSIS installer) |
 | `TinyLM-Council-<version>-Windows-Setup.exe` | Same build, versioned filename |
 
-**Latest:** `v0.9.0` — file/code and image attachments, plus composer/sidebar layout polish. Download `TinyLM-Council-Windows-Setup.exe` or `TinyLM-Council-0.9.0-Windows-Setup.exe`.
+**Latest:** `v0.10.0` — Joint draft deliberation, stronger Debate converge (rounds 1–5 + early-exit). Download `TinyLM-Council-Windows-Setup.exe` or `TinyLM-Council-0.10.0-Windows-Setup.exe`.
 
-Install Ollama or LM Studio separately, then launch **TinyLM Council** from the Start menu. Details: **[docs/WINDOWS_DESKTOP.md](docs/WINDOWS_DESKTOP.md)**. Debate walkthrough: **[docs/WINDOWS_SETUP.md#debate-mode-summary](docs/WINDOWS_SETUP.md#debate-mode-summary)**. Attachments: **[docs/WINDOWS_SETUP.md#attachments](docs/WINDOWS_SETUP.md#attachments)**.
+Install Ollama or LM Studio separately, then launch **TinyLM Council** from the Start menu. Details: **[docs/WINDOWS_DESKTOP.md](docs/WINDOWS_DESKTOP.md)**. Debate / Joint draft: **[docs/WINDOWS_SETUP.md#debate-mode-summary](docs/WINDOWS_SETUP.md#debate-mode-summary)**. Attachments: **[docs/WINDOWS_SETUP.md#attachments](docs/WINDOWS_SETUP.md#attachments)**.
 
 Release notes: [CHANGELOG.md](CHANGELOG.md).
 
@@ -32,8 +32,9 @@ Release notes: [CHANGELOG.md](CHANGELOG.md).
 1. **Stage 1 — First opinions:** Your question (plus optional **attached files/images** and web search) goes to all council members in parallel.
 2. **Stage 2 — Deliberation** (choose in Settings or per message), or **Quick mode** to skip this stage:
    - **Ranked peer review** (default): each member anonymously ranks the others' answers.
-   - **Debate:** members rebut each other for 1–3 rounds (early-exit if they converge), then revise their positions.
-3. **Stage 3 — Final answer:** The chairman compiles everything into one consensus response (streams live in the UI).
+   - **Debate:** members rebut each other for 1–5 rounds (early-exit if they converge), then revise their positions.
+   - **Joint draft:** members revise one shared draft for 1–5 rounds (editor merges suggestions; early-exit when the draft stabilizes).
+3. **Stage 3 — Final answer:** The chairman compiles everything into one consensus response (streams live in the UI). In Joint draft mode the chairman polishes the shared draft rather than writing from scratch.
 
 ### Attachments (v0.9.0+)
 

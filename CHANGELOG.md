@@ -4,6 +4,18 @@ All notable changes to TinyLM Council are documented here.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-14
+
+### Added
+
+- **Joint draft deliberation mode** — Settings and composer **Mode → Joint draft**; Stage 2 iterates one shared draft (members suggest revisions, chairman/editor merges) for 1–5 rounds, then Stage 3 polishes the draft
+- **Shared draft UI / SSE** — `SharedDraftRounds` panel plus `draft_start` / `draft_member_complete` / `draft_round_complete` / `draft_complete` events; persists `shared_draft_rounds` on the assistant message
+
+### Changed
+
+- **Debate rounds 1–5** — Settings and API accept up to five debate rounds (was 1–3); early convergence still stops the loop and surfaces `debate_early_exit` / a “Converged early” badge in the UI
+- **Draft early-exit** — consecutive shared drafts that converge set `draft_early_exit` and stop further rounds
+
 ## [0.9.0] - 2026-10-12
 
 ### Added
@@ -161,6 +173,7 @@ All notable changes to TinyLM Council are documented here.
 - Windows launcher (`start.ps1`)
 - LM Studio council reliability improvements
 
+[0.10.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.10.0
 [0.9.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.9.0
 [0.8.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.8.0
 [0.7.1]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.7.1
