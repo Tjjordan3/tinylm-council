@@ -89,7 +89,7 @@ _CORS_ORIGINS = [
     "http://127.0.0.1:1420",
 ]
 
-APP_VERSION = "0.9.0"
+APP_VERSION = "0.10.0"
 APP_FEATURES = ["debate", "draft", "streaming", "quick_mode", "attachments"]
 
 app.add_middleware(

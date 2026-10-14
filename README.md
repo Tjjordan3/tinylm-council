@@ -13,9 +13,9 @@ Get the Windows desktop installer from GitHub Releases:
 | `TinyLM-Council-Windows-Setup.exe` | Windows 10/11 (NSIS installer) |
 | `TinyLM-Council-<version>-Windows-Setup.exe` | Same build, versioned filename |
 
-**Latest:** `v0.9.0` — file/code and image attachments, plus composer/sidebar layout polish. Download `TinyLM-Council-Windows-Setup.exe` or `TinyLM-Council-0.9.0-Windows-Setup.exe`.
+**Latest:** `v0.10.0` — Joint draft deliberation, stronger Debate converge (rounds 1–5 + early-exit). Download `TinyLM-Council-Windows-Setup.exe` or `TinyLM-Council-0.10.0-Windows-Setup.exe`.
 
-Install Ollama or LM Studio separately, then launch **TinyLM Council** from the Start menu. Details: **[docs/WINDOWS_DESKTOP.md](docs/WINDOWS_DESKTOP.md)**. Debate walkthrough: **[docs/WINDOWS_SETUP.md#debate-mode-summary](docs/WINDOWS_SETUP.md#debate-mode-summary)**. Attachments: **[docs/WINDOWS_SETUP.md#attachments](docs/WINDOWS_SETUP.md#attachments)**.
+Install Ollama or LM Studio separately, then launch **TinyLM Council** from the Start menu. Details: **[docs/WINDOWS_DESKTOP.md](docs/WINDOWS_DESKTOP.md)**. Debate / Joint draft: **[docs/WINDOWS_SETUP.md#debate-mode-summary](docs/WINDOWS_SETUP.md#debate-mode-summary)**. Attachments: **[docs/WINDOWS_SETUP.md#attachments](docs/WINDOWS_SETUP.md#attachments)**.
 
 Release notes: [CHANGELOG.md](CHANGELOG.md).
 

@@ -57,6 +57,11 @@ Same as the web app:
 
 See [WINDOWS_SETUP.md](WINDOWS_SETUP.md) for provider tips, Tailscale phone access (via the classic browser launcher), and troubleshooting.
 
+## What’s new in v0.10.0+
+
+- **Joint draft** — new deliberation mode that iterates one shared answer (peer suggestions + editor merge) before the chairman finalizes. Settings or composer **Mode → Joint draft**; rounds 1–5 with early-exit when the draft stabilizes. See [Joint draft mode](WINDOWS_SETUP.md#joint-draft-mode-summary).
+- **Stronger Debate converge** — debate rounds raised to **1–5**; stops early when positions agree and shows a **Converged early** badge. See [Debate mode](WINDOWS_SETUP.md#debate-mode-summary).
+
 ## What’s new in v0.9.0+
 
 - **Attachments** — composer **Attach** adds text/code files and images to a turn. Text/code is packed into Stage 1 (up to 8 files, 256 KB each). Images (up to 4, 4 MB each) go to vision-capable members; mark **Vision** on a member in Settings or use a vision model name. Attachments persist with the chat and are removed when you delete it. See [WINDOWS_SETUP.md — Attachments](WINDOWS_SETUP.md#attachments).

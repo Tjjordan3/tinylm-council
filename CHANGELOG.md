@@ -4,6 +4,8 @@ All notable changes to TinyLM Council are documented here.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-14
+
 ### Added
 
 - **Joint draft deliberation mode** — Settings and composer **Mode → Joint draft**; Stage 2 iterates one shared draft (members suggest revisions, chairman/editor merges) for 1–5 rounds, then Stage 3 polishes the draft
@@ -171,6 +173,7 @@ All notable changes to TinyLM Council are documented here.
 - Windows launcher (`start.ps1`)
 - LM Studio council reliability improvements
 
+[0.10.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.10.0
 [0.9.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.9.0
 [0.8.0]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.8.0
 [0.7.1]: https://github.com/Tjjordan3/tinylm-council/releases/tag/v0.7.1
