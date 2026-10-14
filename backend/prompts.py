@@ -10,6 +10,8 @@ STAGE_LIMITS = {
         "stage1": {"max_tokens": 400, "temperature": 0.7},
         "stage2": {"max_tokens": 128, "temperature": 0.2},
         "debate": {"max_tokens": 250, "temperature": 0.4},
+        "draft": {"max_tokens": 280, "temperature": 0.4},
+        "draft_editor": {"max_tokens": 400, "temperature": 0.3},
         "stage3": {"max_tokens": 700, "temperature": 0.5},
         "title": {"max_tokens": 15, "temperature": 0.3},
     },
@@ -17,6 +19,8 @@ STAGE_LIMITS = {
         "stage1": {"max_tokens": None, "temperature": None},
         "stage2": {"max_tokens": None, "temperature": None},
         "debate": {"max_tokens": None, "temperature": None},
+        "draft": {"max_tokens": None, "temperature": None},
+        "draft_editor": {"max_tokens": None, "temperature": None},
         "stage3": {"max_tokens": None, "temperature": None},
         "title": {"max_tokens": 30, "temperature": 0.3},
     },
@@ -60,22 +64,46 @@ def build_stage1_user_text(
     return "\n\n".join(parts)
 
 
+def _stage1_system_nudge(profile: str, deliberation_mode: str = "rank", *, vision: bool = False) -> str:
+    mode = (deliberation_mode or "rank").strip().lower()
+    if profile == "tiny":
+        if mode == "draft":
+            base = (
+                "Write a solid first draft answer in 2-5 sentences. "
+                "Be direct and accurate; peers will revise a shared draft next."
+            )
+        else:
+            base = "Answer in 2-5 sentences. Be direct and accurate."
+        if vision:
+            base += " Use attached images when relevant."
+        return base
+    if mode == "draft":
+        base = (
+            "Write a clear first-draft answer suitable for collaborative editing. "
+            "Be accurate and structured; peers will revise a shared draft next."
+        )
+        if vision:
+            base += " Use attached images when relevant."
+        return base
+    if vision:
+        return "Be direct and accurate. Use attached images when relevant."
+    return ""
+
+
 def build_stage1_messages(
     user_query: str,
     profile: str,
     web_context: str = "",
     attachments_context: str = "",
+    deliberation_mode: str = "rank",
 ) -> List[dict]:
     user_content = build_stage1_user_text(
         user_query, web_context=web_context, attachments_context=attachments_context
     )
-
-    if profile == "tiny":
+    nudge = _stage1_system_nudge(profile, deliberation_mode)
+    if nudge:
         return [
-            {
-                "role": "system",
-                "content": "Answer in 2-5 sentences. Be direct and accurate.",
-            },
+            {"role": "system", "content": nudge},
             {"role": "user", "content": user_content},
         ]
     return [{"role": "user", "content": user_content}]
@@ -87,6 +115,7 @@ def build_stage1_messages_with_images(
     web_context: str = "",
     attachments_context: str = "",
     image_data_urls: Optional[List[str]] = None,
+    deliberation_mode: str = "rank",
 ) -> List[dict]:
     """Stage 1 messages; when image_data_urls set, user content is multimodal parts."""
     text = build_stage1_user_text(
@@ -95,7 +124,11 @@ def build_stage1_messages_with_images(
     urls = [u for u in (image_data_urls or []) if u]
     if not urls:
         return build_stage1_messages(
-            user_query, profile, web_context=web_context, attachments_context=attachments_context
+            user_query,
+            profile,
+            web_context=web_context,
+            attachments_context=attachments_context,
+            deliberation_mode=deliberation_mode,
         )
 
     user_content: List[dict] = [{"type": "text", "text": text}]
@@ -103,14 +136,9 @@ def build_stage1_messages_with_images(
         user_content.append({"type": "image_url", "image_url": {"url": url}})
 
     messages: List[dict] = [{"role": "user", "content": user_content}]
-    if profile == "tiny":
-        messages.insert(
-            0,
-            {
-                "role": "system",
-                "content": "Answer in 2-5 sentences. Be direct and accurate. Use attached images when relevant.",
-            },
-        )
+    nudge = _stage1_system_nudge(profile, deliberation_mode, vision=True)
+    if nudge:
+        messages.insert(0, {"role": "system", "content": nudge})
     return messages
 
 
@@ -243,6 +271,111 @@ def summarize_debate_for_stage3(
     return "\n\n".join(parts)
 
 
+def build_draft_critique_prompt(
+    user_query: str,
+    shared_draft: str,
+    own_label: str,
+    round_number: int,
+    profile: str,
+    web_context: str = "",
+) -> str:
+    """Ask a member to propose a revision against the current shared draft."""
+    web_block = format_web_context_block(web_context)
+    draft = (shared_draft or "").strip() or "(empty)"
+
+    if profile == "tiny":
+        return f"""Question: {user_query}
+
+{web_block}Shared draft:
+{draft}
+
+You are {own_label}. Draft round {round_number}.
+In 2-4 sentences, suggest concrete edits (fixes, missing points, clearer wording). Reply with your suggested revision of the full draft only."""
+
+    return f"""You are contributing to a joint shared draft (round {round_number}). You are {own_label}.
+
+Original question: {user_query}
+
+{web_block}Current shared draft:
+{draft}
+
+Propose a revised version of the full draft:
+- Fix errors and weak reasoning
+- Add important missing points
+- Keep what already works
+- Do not mention your real model identity beyond {own_label}
+
+Reply with the revised draft text only."""
+
+
+def build_draft_editor_prompt(
+    user_query: str,
+    shared_draft: str,
+    suggestions: List[Dict[str, str]],
+    round_number: int,
+    profile: str,
+    web_context: str = "",
+) -> str:
+    """Ask the editor to merge peer suggestions into the next shared draft."""
+    web_block = format_web_context_block(web_context)
+    draft = (shared_draft or "").strip() or "(empty)"
+    suggestions_text = "\n\n".join(
+        f"{item.get('label') or 'Suggestion'}:\n{(item.get('text') or '').strip()}"
+        for item in suggestions
+        if (item.get("text") or "").strip()
+    ) or "(No successful suggestions)"
+
+    if profile == "tiny":
+        return f"""Question: {user_query}
+
+{web_block}Current shared draft:
+{draft}
+
+Peer suggestions:
+{suggestions_text}
+
+Draft round {round_number}. Merge the best suggestions into one improved draft. Reply with the full updated draft only."""
+
+    return f"""You are the editor for a joint council draft (round {round_number}).
+
+Original question: {user_query}
+
+{web_block}Current shared draft:
+{draft}
+
+Anonymized peer revision suggestions:
+{suggestions_text}
+
+Merge the strongest improvements into one coherent next draft. Prefer accuracy and clarity over length. Reply with the full updated draft only (not a commentary)."""
+
+
+def summarize_draft_for_stage3(
+    shared_draft_rounds: List[Dict[str, Any]], profile: str
+) -> str:
+    """Compact joint-draft history for the chairman finalize prompt."""
+    if not shared_draft_rounds:
+        return "(No shared draft rounds)"
+
+    parts: List[str] = []
+    for round_data in shared_draft_rounds:
+        round_num = round_data.get("round", "?")
+        draft = (round_data.get("draft") or "").strip()
+        if profile == "tiny" and len(draft) > 700:
+            draft = draft[:697] + "..."
+        parts.append(f"--- Draft after round {round_num} ---\n{draft or '(empty)'}")
+        edits = round_data.get("edits") or []
+        if edits and profile != "tiny":
+            for edit in edits:
+                name = edit.get("display_name") or edit.get("model") or "Member"
+                text = (edit.get("response") or "").strip()
+                if edit.get("error") and not text:
+                    text = f"(failed: {edit['error']})"
+                if len(text) > 400:
+                    text = text[:397] + "..."
+                parts.append(f"Suggestion from {name}:\n{text}")
+    return "\n\n".join(parts)
+
+
 def build_stage3_prompt(
     user_query: str,
     stage1_results: List[Dict[str, Any]],
@@ -308,6 +441,37 @@ Your task as Chairman is to synthesize a single, comprehensive, accurate consens
 - Remaining disagreements and which side is better supported
 
 Provide a clear, well-reasoned final answer that represents the council's collective wisdom:"""
+
+    if mode == "draft":
+        if profile == "tiny":
+            return f"""You are the Chairman. Polish the shared draft into one clear final answer. Edit and finalize; do not rewrite from scratch unless the draft is empty or wrong.
+
+Question: {user_query}
+
+{web_block}Initial answers:
+{stage1_text}
+
+Shared draft history:
+{stage2_summary}
+
+Write the finalized answer:"""
+
+        return f"""You are the Chairman of an LLM Council. Members wrote candidate answers, then iteratively improved one shared draft.
+
+Original Question: {user_query}
+
+{web_block}STAGE 1 - Initial Responses:
+{stage1_text}
+
+STAGE 2 - Shared draft rounds:
+{stage2_summary}
+
+Your task as Chairman is to edit and finalize the latest shared draft into one polished answer:
+- Prefer the shared draft as the primary source; do not discard it to rewrite from scratch
+- Fix remaining errors, tighten wording, and fill only critical gaps
+- Use Stage 1 answers only to recover missing facts if the draft is incomplete
+
+Provide the final polished answer:"""
 
     if profile == "tiny":
         return f"""You are the Chairman. Combine the best parts of these answers into one clear reply.

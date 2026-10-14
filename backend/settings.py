@@ -191,7 +191,7 @@ def settings_from_dict(data: Dict[str, Any]) -> AppSettings:
     else:
         parallel_local_inference = _default_parallel_local_inference(providers)
     mode = (data.get("deliberation_mode") or "rank").strip().lower()
-    if mode not in ("rank", "debate"):
+    if mode not in ("rank", "debate", "draft"):
         mode = "rank"
     try:
         rounds = int(data.get("debate_rounds", 1))
@@ -263,7 +263,7 @@ def update_settings(data: Dict[str, Any]) -> AppSettings:
         current.council_profile = data["council_profile"]
     if "deliberation_mode" in data:
         mode = (data["deliberation_mode"] or "rank").strip().lower()
-        current.deliberation_mode = mode if mode in ("rank", "debate") else "rank"
+        current.deliberation_mode = mode if mode in ("rank", "debate", "draft") else "rank"
     if "debate_rounds" in data:
         try:
             rounds = int(data["debate_rounds"])

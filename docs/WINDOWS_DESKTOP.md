@@ -83,6 +83,18 @@ From **v0.7.0**, the desktop app includes **Debate** deliberation alongside rank
 
 Enable it under **Settings → Deliberation mode → Debate**, or use the chat **Mode** dropdown for one message. Full notes: [WINDOWS_SETUP.md — Debate mode](WINDOWS_SETUP.md#debate-mode-summary).
 
+## Joint draft mode (summary)
+
+**Joint draft** iterates one shared answer before the chairman finalizes.
+
+| Step | What happens |
+|------|----------------|
+| **1. First opinions** | Members write candidate drafts. |
+| **2. Joint draft** | For 1–5 rounds, peers suggest revisions; an editor merges them into the next shared draft (stops early if it stabilizes). |
+| **3. Final answer** | The chairman polishes the shared draft. |
+
+Enable under **Settings → Deliberation mode → Joint draft**, or composer **Mode → Joint draft**. Details: [WINDOWS_SETUP.md — Joint draft](WINDOWS_SETUP.md#joint-draft-mode-summary).
+
 ## Develop the desktop app
 
 Requirements: Node.js 18+, Rust stable, Python 3.10+, and the usual project deps.

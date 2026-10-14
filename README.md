@@ -33,7 +33,8 @@ Release notes: [CHANGELOG.md](CHANGELOG.md).
 2. **Stage 2 — Deliberation** (choose in Settings or per message), or **Quick mode** to skip this stage:
    - **Ranked peer review** (default): each member anonymously ranks the others' answers.
    - **Debate:** members rebut each other for 1–5 rounds (early-exit if they converge), then revise their positions.
-3. **Stage 3 — Final answer:** The chairman compiles everything into one consensus response (streams live in the UI).
+   - **Joint draft:** members revise one shared draft for 1–5 rounds (editor merges suggestions; early-exit when the draft stabilizes).
+3. **Stage 3 — Final answer:** The chairman compiles everything into one consensus response (streams live in the UI). In Joint draft mode the chairman polishes the shared draft rather than writing from scratch.
 
 ### Attachments (v0.9.0+)
 

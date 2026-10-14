@@ -34,6 +34,7 @@ from .council import (
     should_auto_skip_web_search,
     stage2_collect_rankings,
     stage2_run_debate_rounds,
+    stage2_run_draft_rounds,
     stage3_synthesize_final_stream,
 )
 from .http_client import close_http_clients
@@ -89,7 +90,7 @@ _CORS_ORIGINS = [
 ]
 
 APP_VERSION = "0.9.0"
-APP_FEATURES = ["debate", "streaming", "quick_mode", "attachments"]
+APP_FEATURES = ["debate", "draft", "streaming", "quick_mode", "attachments"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -539,10 +540,11 @@ async def regenerate_chairman_stream(conversation_id: str):
     run_mode = (metadata.get("run_mode") or "full").strip().lower()
     if run_mode == "quick":
         mode = "quick"
-    if mode not in ("rank", "debate", "quick"):
+    if mode not in ("rank", "debate", "draft", "quick"):
         mode = "rank"
     stage2_results = assistant_msg.get("stage2") or []
     debate_rounds_data = assistant_msg.get("debate_rounds") or []
+    shared_draft_rounds_data = assistant_msg.get("shared_draft_rounds") or []
     aggregate_rankings = metadata.get("aggregate_rankings") or []
     web_context = ""
     web_meta = metadata.get("web_search") or {}
@@ -604,6 +606,7 @@ async def regenerate_chairman_stream(conversation_id: str):
                         web_context=web_context,
                         deliberation_mode=mode,
                         debate_rounds=debate_rounds_data,
+                        shared_draft_rounds=shared_draft_rounds_data,
                         on_delta=on_delta,
                     ),
                     stage3_queue,
@@ -651,7 +654,7 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
     if run_mode not in ("full", "quick"):
         run_mode = "full"
     mode = (request.deliberation_mode or settings.deliberation_mode or "rank").strip().lower()
-    if mode not in ("rank", "debate"):
+    if mode not in ("rank", "debate", "draft"):
         mode = "rank"
     if run_mode == "quick":
         mode = "quick"
@@ -781,6 +784,7 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                     profile,
                     web_context=web_context,
                     attachments_context=attachments_context,
+                    deliberation_mode=mode if run_mode != "quick" else "rank",
                 )
                 event_queue: asyncio.Queue = asyncio.Queue()
 
@@ -816,6 +820,7 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                                 web_context=web_context,
                                 attachments_context=attachments_context,
                                 image_data_urls=image_urls,
+                                deliberation_mode=mode if run_mode != "quick" else "rank",
                             )
                             if use_vision
                             else text_only_stage1
@@ -905,10 +910,12 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
 
                 stage2_results: List[dict] = []
                 debate_rounds_data: List[dict] = []
+                shared_draft_rounds_data: List[dict] = []
                 label_to_model: Dict[str, str] = {}
                 ranking_parse_failed = False
                 aggregate_rankings: List[dict] = []
                 debate_early_exit = False
+                draft_early_exit = False
 
                 if run_mode == "quick":
                     yield f"data: {json.dumps({'type': 'stage2_skipped', 'reason': 'quick_mode'})}\n\n"
@@ -957,6 +964,52 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                         else:
                             debate_rounds_data, label_to_model, debate_early_exit = payload
                     yield f"data: {json.dumps({'type': 'debate_complete', 'data': debate_rounds_data, 'metadata': {'label_to_model': label_to_model, 'deliberation_mode': 'debate', 'debate_rounds_count': len(debate_rounds_data), 'debate_early_exit': debate_early_exit}})}\n\n"
+                elif mode == "draft":
+                    yield f"data: {json.dumps({'type': 'draft_start', 'rounds': rounds})}\n\n"
+                    draft_queue: asyncio.Queue = asyncio.Queue()
+
+                    def on_draft_member(round_number: int, result: dict) -> None:
+                        draft_queue.put_nowait(
+                            {
+                                "type": "draft_member_complete",
+                                "round": round_number,
+                                "data": result,
+                            }
+                        )
+
+                    def on_draft_round(round_data: dict) -> None:
+                        draft_queue.put_nowait(
+                            {
+                                "type": "draft_round_complete",
+                                "round": round_data.get("round"),
+                                "draft": round_data.get("draft") or "",
+                                "data": round_data,
+                            }
+                        )
+
+                    async for kind, payload in _iter_with_live_events(
+                        stage2_run_draft_rounds(
+                            registry,
+                            members,
+                            request.content,
+                            stage1_results,
+                            profile,
+                            debate_rounds=rounds,
+                            web_context=web_context,
+                            chairman=chairman,
+                            on_member_complete=on_draft_member,
+                            on_round_complete=on_draft_round,
+                        ),
+                        draft_queue,
+                        inflight=inflight,
+                    ):
+                        if kind == "event":
+                            yield f"data: {json.dumps(payload)}\n\n"
+                        elif kind == "keepalive":
+                            yield ": keepalive\n\n"
+                        else:
+                            shared_draft_rounds_data, label_to_model, draft_early_exit = payload
+                    yield f"data: {json.dumps({'type': 'draft_complete', 'data': shared_draft_rounds_data, 'metadata': {'label_to_model': label_to_model, 'deliberation_mode': 'draft', 'debate_rounds_count': len(shared_draft_rounds_data), 'draft_early_exit': draft_early_exit}})}\n\n"
                 else:
                     yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
                     rank_queue: asyncio.Queue = asyncio.Queue()
@@ -1026,6 +1079,7 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                         web_context=web_context,
                         deliberation_mode=mode,
                         debate_rounds=debate_rounds_data,
+                        shared_draft_rounds=shared_draft_rounds_data,
                         on_delta=on_stage3_delta,
                     ),
                     stage3_queue,
@@ -1039,6 +1093,11 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                         stage3_result = payload
                 yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
 
+                rounds_run = (
+                    len(shared_draft_rounds_data)
+                    if mode == "draft"
+                    else len(debate_rounds_data)
+                )
                 metadata = {
                     "label_to_model": label_to_model,
                     "aggregate_rankings": aggregate_rankings,
@@ -1046,8 +1105,9 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                     "council_profile": profile,
                     "deliberation_mode": "rank" if mode == "quick" else mode,
                     "run_mode": run_mode,
-                    "debate_rounds_count": len(debate_rounds_data),
+                    "debate_rounds_count": rounds_run,
                     "debate_early_exit": debate_early_exit,
+                    "draft_early_exit": draft_early_exit,
                     "failed_members": [
                         r.get("display_name")
                         for r in all_stage1
@@ -1073,6 +1133,7 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                     stage3_result,
                     metadata,
                     debate_rounds=debate_rounds_data or None,
+                    shared_draft_rounds=shared_draft_rounds_data or None,
                 )
                 assistant_saved = True
                 yield f"data: {json.dumps({'type': 'complete'})}\n\n"

@@ -4,6 +4,7 @@ import Stage2 from './Stage2';
 import Stage3 from './Stage3';
 import StageProgress from './StageProgress';
 import DebateRounds from './DebateRounds';
+import SharedDraftRounds from './SharedDraftRounds';
 import WebSources from './WebSources';
 import { api } from '../api';
 
@@ -68,9 +69,11 @@ export default function ChatInterface({
 }) {
   const [input, setInput] = useState('');
   const [useWebSearch, setUseWebSearch] = useState(false);
-  const [deliberationMode, setDeliberationMode] = useState(
-    settings?.deliberation_mode === 'debate' ? 'debate' : 'rank'
-  );
+  const [deliberationMode, setDeliberationMode] = useState(() => {
+    const mode = settings?.deliberation_mode;
+    if (mode === 'debate' || mode === 'draft' || mode === 'rank') return mode;
+    return 'rank';
+  });
   const [runMode, setRunMode] = useState(settings?.default_run_mode === 'quick' ? 'quick' : 'full');
   const [maxMembers, setMaxMembers] = useState(
     settings?.default_max_members != null ? String(settings.default_max_members) : ''
@@ -88,7 +91,11 @@ export default function ChatInterface({
 
   useEffect(() => {
     if (modeTouched) return;
-    if (settings?.deliberation_mode === 'debate' || settings?.deliberation_mode === 'rank') {
+    if (
+      settings?.deliberation_mode === 'debate' ||
+      settings?.deliberation_mode === 'draft' ||
+      settings?.deliberation_mode === 'rank'
+    ) {
       setDeliberationMode(settings.deliberation_mode);
     }
   }, [settings?.deliberation_mode, modeTouched]);
@@ -274,6 +281,7 @@ export default function ChatInterface({
                 >
                   <option value="rank">Ranked peer review</option>
                   <option value="debate">Debate</option>
+                  <option value="draft">Joint draft</option>
                 </select>
               </label>
             )}
@@ -336,18 +344,25 @@ export default function ChatInterface({
             const isLastAssistant =
               msg.role === 'assistant' && index === messageList.length - 1;
             const run = msg.metadata?.run_mode || 'full';
+            const sharedDraftRounds = msg.sharedDraftRounds || msg.shared_draft_rounds;
+            const debateRounds = msg.debateRounds || msg.debate_rounds;
             const mode =
               run === 'quick'
                 ? 'rank'
                 : msg.metadata?.deliberation_mode ||
-                  (msg.debate_rounds?.length || msg.debateRounds?.length ? 'debate' : 'rank');
-            const debateRounds = msg.debateRounds || msg.debate_rounds;
+                  (sharedDraftRounds?.length
+                    ? 'draft'
+                    : debateRounds?.length
+                      ? 'debate'
+                      : 'rank');
             const stage2Done =
               run === 'quick'
                 ? Boolean(msg.stage1?.length || msg.allStage1?.length)
                 : mode === 'debate'
                   ? !!debateRounds?.length
-                  : !!msg.stage2;
+                  : mode === 'draft'
+                    ? !!sharedDraftRounds?.length
+                    : !!msg.stage2;
             const userAttachments = msg.attachments || msg.metadata?.attachments || [];
             return (
               <div key={index} className="mb-8">
@@ -377,6 +392,7 @@ export default function ChatInterface({
                           msg.allStage1?.length ||
                           msg.stage2 ||
                           debateRounds?.length ||
+                          sharedDraftRounds?.length ||
                           msg.stage3
                       )}
                       stage2Done={stage2Done}
@@ -386,6 +402,7 @@ export default function ChatInterface({
                       runMode={run}
                       stageStartedAt={msg.stageStartedAt}
                       debateEarlyExit={!!msg.metadata?.debate_early_exit}
+                      draftEarlyExit={!!msg.metadata?.draft_early_exit}
                     />
 
                     <WebSources
@@ -405,6 +422,13 @@ export default function ChatInterface({
                           rounds={debateRounds}
                           labelToModel={msg.metadata?.label_to_model}
                           earlyExit={!!msg.metadata?.debate_early_exit}
+                          defaultCollapsed={!!msg.stage3 && !msg.loading?.stage3}
+                        />
+                      ) : mode === 'draft' ? (
+                        <SharedDraftRounds
+                          rounds={sharedDraftRounds}
+                          labelToModel={msg.metadata?.label_to_model}
+                          earlyExit={!!msg.metadata?.draft_early_exit}
                           defaultCollapsed={!!msg.stage3 && !msg.loading?.stage3}
                         />
                       ) : (
